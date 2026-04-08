@@ -237,10 +237,7 @@ func makeListIssuesHandler(client *api.Client) server.ToolHandlerFunc {
 			TotalCount int         `json:"total_count"`
 		}{Issues: issues, TotalCount: total}
 
-		text, err := toJSON(result)
-		if err != nil {
-			return mcp.NewToolResultError(err.Error()), nil
-		}
+		text, _ := toJSON(result)
 		return mcp.NewToolResultText(text), nil
 	}
 }
@@ -259,10 +256,7 @@ func makeGetIssueHandler(client *api.Client) server.ToolHandlerFunc {
 			return mcp.NewToolResultError(err.Error()), nil
 		}
 
-		text, err := toJSON(issue)
-		if err != nil {
-			return mcp.NewToolResultError(err.Error()), nil
-		}
+		text, _ := toJSON(issue)
 		return mcp.NewToolResultText(text), nil
 	}
 }
@@ -300,10 +294,7 @@ func makeCreateIssueHandler(client *api.Client) server.ToolHandlerFunc {
 			return mcp.NewToolResultError(err.Error()), nil
 		}
 
-		text, err := toJSON(issue)
-		if err != nil {
-			return mcp.NewToolResultError(err.Error()), nil
-		}
+		text, _ := toJSON(issue)
 		return mcp.NewToolResultText(text), nil
 	}
 }
@@ -330,13 +321,10 @@ func makeUpdateIssueHandler(client *api.Client) server.ToolHandlerFunc {
 			return mcp.NewToolResultError(err.Error()), nil
 		}
 
-		text, err := toJSON(struct {
+		text, _ := toJSON(struct {
 			Status  string `json:"status"`
 			Message string `json:"message"`
 		}{Status: "ok", Message: fmt.Sprintf("Updated issue #%d", id)})
-		if err != nil {
-			return mcp.NewToolResultError(err.Error()), nil
-		}
 		return mcp.NewToolResultText(text), nil
 	}
 }
@@ -354,13 +342,10 @@ func makeDeleteIssueHandler(client *api.Client) server.ToolHandlerFunc {
 			return mcp.NewToolResultError(err.Error()), nil
 		}
 
-		text, err := toJSON(struct {
+		text, _ := toJSON(struct {
 			Status  string `json:"status"`
 			Message string `json:"message"`
 		}{Status: "ok", Message: fmt.Sprintf("Deleted issue #%d", id)})
-		if err != nil {
-			return mcp.NewToolResultError(err.Error()), nil
-		}
 		return mcp.NewToolResultText(text), nil
 	}
 }

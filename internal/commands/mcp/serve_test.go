@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"testing"
 
 	mcplib "github.com/mark3labs/mcp-go/mcp"
@@ -411,6 +412,25 @@ func TestNewCmdMcp(t *testing.T) {
 	}
 	if !found {
 		t.Error("expected 'serve' subcommand not found")
+	}
+}
+
+func TestServeStdioFunc_Default(t *testing.T) {
+	// Verify the default serveStdioFunc calls server.ServeStdio.
+	// Provide an immediately-closed stdin so ServeStdio returns on EOF.
+	r, w, err := os.Pipe()
+	if err != nil {
+		t.Fatalf("creating pipe: %v", err)
+	}
+	w.Close()
+
+	origStdin := os.Stdin
+	os.Stdin = r
+	defer func() { os.Stdin = origStdin }()
+
+	s := server.NewMCPServer("test", "0.1.0")
+	if err := serveStdioFunc(s); err != nil {
+		t.Fatalf("unexpected error: %v", err)
 	}
 }
 

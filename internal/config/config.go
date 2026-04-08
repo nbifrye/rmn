@@ -63,10 +63,6 @@ func (c *Config) Save() error {
 		return err
 	}
 
-	data, err := json.MarshalIndent(c, "", "  ")
-	if err != nil {
-		return err
-	}
-
+	data, _ := json.MarshalIndent(c, "", "  ")
 	return os.WriteFile(path, data, 0o600)
 }
