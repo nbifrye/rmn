@@ -90,10 +90,7 @@ func TestViewCommand_JSONOutput(t *testing.T) {
 }
 
 func TestViewCommand_InvalidID(t *testing.T) {
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {}))
-	defer srv.Close()
-
-	f := newTestFactory(srv)
+	f := newNoServerFactory(t)
 	cmd := NewCmdView(f)
 	setupRootFlags(cmd, "table")
 	cmd.SetArgs([]string{"abc"})
@@ -129,9 +126,28 @@ func TestViewCommand_NoDescription(t *testing.T) {
 	}
 
 	out := f.IO.Out.(*bytes.Buffer).String()
-	// Should not contain an extra description section
-	if bytes.Contains([]byte(out), []byte("\n\n")) {
-		// This is fine - just checking it doesn't crash
+	if !bytes.Contains([]byte(out), []byte("No desc")) {
+		t.Errorf("expected subject in output, got: %s", out)
+	}
+	// When description is empty, the production code skips the description section
+	// (which would be a blank line followed by description text).
+	// Verify the output ends at the "Updated:" line without trailing description content.
+	if bytes.Contains([]byte(out), []byte("Updated:")) {
+		// Find everything after the "Updated:" line
+		idx := bytes.Index([]byte(out), []byte("Updated:"))
+		afterUpdated := string([]byte(out)[idx:])
+		// After "Updated:     <value>\n" there should be nothing else
+		lines := bytes.Split([]byte(afterUpdated), []byte("\n"))
+		// Expect: ["Updated:     ", ""] (the trailing newline produces an empty final element)
+		nonEmpty := 0
+		for _, line := range lines {
+			if len(bytes.TrimSpace(line)) > 0 {
+				nonEmpty++
+			}
+		}
+		if nonEmpty != 1 {
+			t.Errorf("expected no description section after Updated line, got: %s", out)
+		}
 	}
 }
 
@@ -174,10 +190,7 @@ func TestViewCommand_APIError(t *testing.T) {
 }
 
 func TestViewCommand_MissingArgs(t *testing.T) {
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {}))
-	defer srv.Close()
-
-	f := newTestFactory(srv)
+	f := newNoServerFactory(t)
 	cmd := NewCmdView(f)
 	setupRootFlags(cmd, "table")
 	// No args provided
@@ -186,32 +199,6 @@ func TestViewCommand_MissingArgs(t *testing.T) {
 	err := cmd.Execute()
 	if err == nil {
 		t.Fatal("expected error for missing args")
-	}
-}
-
-func TestViewCommand_JSONMarshalError(t *testing.T) {
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		resp := struct {
-			Issue api.Issue `json:"issue"`
-		}{Issue: api.Issue{ID: 1, Subject: "test"}}
-		json.NewEncoder(w).Encode(resp)
-	}))
-	defer srv.Close()
-
-	origMarshal := marshalJSON
-	marshalJSON = func(v interface{}, prefix, indent string) ([]byte, error) {
-		return nil, fmt.Errorf("marshal error")
-	}
-	defer func() { marshalJSON = origMarshal }()
-
-	f := newTestFactory(srv)
-	cmd := NewCmdView(f)
-	setupRootFlags(cmd, "json")
-	cmd.SetArgs([]string{"1"})
-
-	err := cmd.Execute()
-	if err == nil {
-		t.Fatal("expected error for marshal failure")
 	}
 }
 

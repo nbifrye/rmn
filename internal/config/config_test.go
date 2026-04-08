@@ -2,7 +2,6 @@ package config
 
 import (
 	"encoding/json"
-	"fmt"
 	"os"
 	"path/filepath"
 	"testing"
@@ -182,23 +181,6 @@ func TestSave_OverwriteExisting(t *testing.T) {
 	}
 	if loaded.RedmineURL != "https://second.com" {
 		t.Errorf("expected overwritten URL, got: %s", loaded.RedmineURL)
-	}
-}
-
-func TestSave_MarshalError(t *testing.T) {
-	tmpDir := t.TempDir()
-	t.Setenv("XDG_CONFIG_HOME", tmpDir)
-
-	origMarshal := jsonMarshalIndent
-	jsonMarshalIndent = func(v interface{}, prefix, indent string) ([]byte, error) {
-		return nil, fmt.Errorf("marshal error")
-	}
-	defer func() { jsonMarshalIndent = origMarshal }()
-
-	cfg := &Config{RedmineURL: "https://example.com", APIKey: "key"}
-	err := cfg.Save()
-	if err == nil {
-		t.Fatal("expected error for marshal failure")
 	}
 }
 

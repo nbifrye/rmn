@@ -3,6 +3,7 @@ package issue
 import (
 	"bytes"
 	"net/http/httptest"
+	"testing"
 
 	"github.com/nbifrye/rmn/internal/api"
 	"github.com/nbifrye/rmn/internal/cmdutil"
@@ -17,6 +18,24 @@ func newTestFactory(srv *httptest.Server) *cmdutil.Factory {
 		},
 		APIClient: func() (*api.Client, error) {
 			return api.NewClient(srv.URL, "test"), nil
+		},
+		IO: &cmdutil.IOStreams{
+			In:     &bytes.Buffer{},
+			Out:    &bytes.Buffer{},
+			ErrOut: &bytes.Buffer{},
+		},
+	}
+}
+
+// newNoServerFactory creates a Factory for tests where no HTTP call should be made.
+// APIClient panics if called, ensuring tests fail if an unexpected call occurs.
+func newNoServerFactory(t *testing.T) *cmdutil.Factory {
+	t.Helper()
+	return &cmdutil.Factory{
+		Config: func() (*config.Config, error) { return &config.Config{}, nil },
+		APIClient: func() (*api.Client, error) {
+			t.Fatal("APIClient should not be called in this test")
+			return nil, nil
 		},
 		IO: &cmdutil.IOStreams{
 			In:     &bytes.Buffer{},
