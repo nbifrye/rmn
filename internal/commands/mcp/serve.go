@@ -237,7 +237,10 @@ func makeListIssuesHandler(client *api.Client) server.ToolHandlerFunc {
 			TotalCount int         `json:"total_count"`
 		}{Issues: issues, TotalCount: total}
 
-		text, _ := toJSON(result)
+		text, err := toJSON(result)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to marshal response: %v", err)), nil
+		}
 		return mcp.NewToolResultText(text), nil
 	}
 }
@@ -247,8 +250,8 @@ func makeGetIssueHandler(client *api.Client) server.ToolHandlerFunc {
 		args := getArgs(req)
 
 		id := getIntArg(args, "issue_id")
-		if id == 0 {
-			return mcp.NewToolResultError("issue_id is required"), nil
+		if id <= 0 {
+			return mcp.NewToolResultError("issue_id must be a positive integer"), nil
 		}
 
 		issue, err := client.GetIssue(ctx, id)
@@ -256,7 +259,10 @@ func makeGetIssueHandler(client *api.Client) server.ToolHandlerFunc {
 			return mcp.NewToolResultError(err.Error()), nil
 		}
 
-		text, _ := toJSON(issue)
+		text, err := toJSON(issue)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to marshal response: %v", err)), nil
+		}
 		return mcp.NewToolResultText(text), nil
 	}
 }
@@ -294,7 +300,10 @@ func makeCreateIssueHandler(client *api.Client) server.ToolHandlerFunc {
 			return mcp.NewToolResultError(err.Error()), nil
 		}
 
-		text, _ := toJSON(issue)
+		text, err := toJSON(issue)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to marshal response: %v", err)), nil
+		}
 		return mcp.NewToolResultText(text), nil
 	}
 }
@@ -304,8 +313,8 @@ func makeUpdateIssueHandler(client *api.Client) server.ToolHandlerFunc {
 		args := getArgs(req)
 
 		id := getIntArg(args, "issue_id")
-		if id == 0 {
-			return mcp.NewToolResultError("issue_id is required"), nil
+		if id <= 0 {
+			return mcp.NewToolResultError("issue_id must be a positive integer"), nil
 		}
 
 		params := api.IssueUpdateParams{
@@ -321,10 +330,13 @@ func makeUpdateIssueHandler(client *api.Client) server.ToolHandlerFunc {
 			return mcp.NewToolResultError(err.Error()), nil
 		}
 
-		text, _ := toJSON(struct {
+		text, err := toJSON(struct {
 			Status  string `json:"status"`
 			Message string `json:"message"`
 		}{Status: "ok", Message: fmt.Sprintf("Updated issue #%d", id)})
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to marshal response: %v", err)), nil
+		}
 		return mcp.NewToolResultText(text), nil
 	}
 }
@@ -334,18 +346,21 @@ func makeDeleteIssueHandler(client *api.Client) server.ToolHandlerFunc {
 		args := getArgs(req)
 
 		id := getIntArg(args, "issue_id")
-		if id == 0 {
-			return mcp.NewToolResultError("issue_id is required"), nil
+		if id <= 0 {
+			return mcp.NewToolResultError("issue_id must be a positive integer"), nil
 		}
 
 		if err := client.DeleteIssue(ctx, id); err != nil {
 			return mcp.NewToolResultError(err.Error()), nil
 		}
 
-		text, _ := toJSON(struct {
+		text, err := toJSON(struct {
 			Status  string `json:"status"`
 			Message string `json:"message"`
 		}{Status: "ok", Message: fmt.Sprintf("Deleted issue #%d", id)})
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to marshal response: %v", err)), nil
+		}
 		return mcp.NewToolResultText(text), nil
 	}
 }

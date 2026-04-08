@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -197,6 +198,17 @@ func TestSave_CreatesDirectory(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
+	// Verify directory permissions
+	dirPath := filepath.Join(tmpDir, "rmn")
+	dirInfo, err := os.Stat(dirPath)
+	if err != nil {
+		t.Fatalf("failed to stat config dir: %v", err)
+	}
+	if dirInfo.Mode().Perm() != 0o700 {
+		t.Errorf("expected directory permissions 0700, got %04o", dirInfo.Mode().Perm())
+	}
+
+	// Verify file permissions
 	path := filepath.Join(tmpDir, "rmn", "config.json")
 	info, err := os.Stat(path)
 	if os.IsNotExist(err) {
@@ -213,5 +225,28 @@ func TestSave_CreatesDirectory(t *testing.T) {
 	}
 	if loaded.RedmineURL != cfg.RedmineURL || loaded.APIKey != cfg.APIKey {
 		t.Errorf("loaded config doesn't match saved: %+v", loaded)
+	}
+}
+
+func TestLoad_InsecurePermissions(t *testing.T) {
+	tmpDir := t.TempDir()
+	t.Setenv("XDG_CONFIG_HOME", tmpDir)
+
+	dir := filepath.Join(tmpDir, "rmn")
+	os.MkdirAll(dir, 0o700)
+
+	data, _ := json.Marshal(Config{
+		RedmineURL: "https://redmine.example.com",
+		APIKey:     "secret-key",
+	})
+	// Write with world-readable permissions
+	os.WriteFile(filepath.Join(dir, "config.json"), data, 0o644)
+
+	_, err := Load()
+	if err == nil {
+		t.Fatal("expected error for insecure file permissions")
+	}
+	if !strings.Contains(err.Error(), "insecure permissions") {
+		t.Errorf("unexpected error: %v", err)
 	}
 }

@@ -2,6 +2,7 @@ package api
 
 import (
 	"context"
+	"crypto/tls"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -309,5 +310,105 @@ func TestDo_InvalidResponseJSON(t *testing.T) {
 	err := c.Get(context.Background(), "/test.json", nil, &result)
 	if err == nil {
 		t.Fatal("expected error for invalid JSON response")
+	}
+}
+
+func TestRedirect_SameHost_KeepsAPIKey(t *testing.T) {
+	var receivedAPIKey string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/redirect" {
+			http.Redirect(w, r, "/destination", http.StatusFound)
+			return
+		}
+		receivedAPIKey = r.Header.Get("X-Redmine-API-Key")
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(`{}`))
+	}))
+	defer srv.Close()
+
+	c := NewClient(srv.URL, "secret-key")
+	var result map[string]interface{}
+	err := c.Get(context.Background(), "/redirect", nil, &result)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if receivedAPIKey != "secret-key" {
+		t.Errorf("expected API key to be preserved on same-host redirect, got %q", receivedAPIKey)
+	}
+}
+
+func TestRedirect_CrossHost_StripsAPIKey(t *testing.T) {
+	var receivedAPIKey string
+	destination := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		receivedAPIKey = r.Header.Get("X-Redmine-API-Key")
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(`{}`))
+	}))
+	defer destination.Close()
+
+	origin := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		http.Redirect(w, r, destination.URL+"/stolen", http.StatusFound)
+	}))
+	defer origin.Close()
+
+	c := NewClient(origin.URL, "secret-key")
+	var result map[string]interface{}
+	err := c.Get(context.Background(), "/start", nil, &result)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if receivedAPIKey != "" {
+		t.Errorf("expected API key to be stripped on cross-host redirect, got %q", receivedAPIKey)
+	}
+}
+
+func TestRedirect_TooManyRedirects(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		http.Redirect(w, r, "/loop", http.StatusFound)
+	}))
+	defer srv.Close()
+
+	c := NewClient(srv.URL, "key")
+	var result map[string]interface{}
+	err := c.Get(context.Background(), "/loop", nil, &result)
+	if err == nil {
+		t.Fatal("expected error for too many redirects")
+	}
+}
+
+func TestResponseBodySizeLimit(t *testing.T) {
+	// Create a server that returns a body larger than maxResponseSize
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		// Write a body slightly over maxResponseSize
+		data := make([]byte, maxResponseSize+1024)
+		for i := range data {
+			data[i] = 'x'
+		}
+		w.Write(data)
+	}))
+	defer srv.Close()
+
+	c := NewClient(srv.URL, "key")
+	err := c.Get(context.Background(), "/large", nil, nil)
+	// The response is truncated to maxResponseSize, which is not valid JSON,
+	// but since result is nil, no JSON parsing happens. The key point is
+	// that we don't OOM - the read is limited.
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestNewClient_TLSMinVersion(t *testing.T) {
+	c := NewClient("https://example.com", "key")
+	transport, ok := c.HTTPClient.Transport.(*http.Transport)
+	if !ok {
+		t.Fatal("expected *http.Transport")
+	}
+	if transport.TLSClientConfig == nil {
+		t.Fatal("expected TLSClientConfig to be set")
+	}
+	if transport.TLSClientConfig.MinVersion != tls.VersionTLS12 {
+		t.Errorf("expected TLS 1.2 minimum, got %d", transport.TLSClientConfig.MinVersion)
 	}
 }
