@@ -50,7 +50,7 @@ func registerTools(s *server.MCPServer, client *api.Client) {
 	s.AddTool(
 		mcp.NewTool("list_issues",
 			mcp.WithDescription("List Redmine issues with optional filters"),
-			mcp.WithNumber("project_id", mcp.Description("Filter by project ID")),
+			mcp.WithString("project_id", mcp.Description("Filter by project ID or identifier")),
 			mcp.WithString("status_id", mcp.Description("Filter by status: open, closed, * (all), or a status ID")),
 			mcp.WithString("assigned_to_id", mcp.Description("Filter by assignee: 'me' or a user ID")),
 			mcp.WithNumber("tracker_id", mcp.Description("Filter by tracker ID")),
@@ -73,7 +73,7 @@ func registerTools(s *server.MCPServer, client *api.Client) {
 	s.AddTool(
 		mcp.NewTool("create_issue",
 			mcp.WithDescription("Create a new Redmine issue"),
-			mcp.WithNumber("project_id", mcp.Required(), mcp.Description("Project ID")),
+			mcp.WithString("project_id", mcp.Required(), mcp.Description("Project ID or identifier")),
 			mcp.WithString("subject", mcp.Required(), mcp.Description("Issue subject")),
 			mcp.WithString("description", mcp.Description("Issue description")),
 			mcp.WithNumber("tracker_id", mcp.Description("Tracker ID")),
@@ -108,9 +108,12 @@ func registerTools(s *server.MCPServer, client *api.Client) {
 	)
 }
 
-func toJSON(v interface{}) string {
-	data, _ := json.MarshalIndent(v, "", "  ")
-	return string(data)
+func toJSON(v interface{}) (string, error) {
+	data, err := json.MarshalIndent(v, "", "  ")
+	if err != nil {
+		return "", fmt.Errorf("marshaling JSON: %w", err)
+	}
+	return string(data), nil
 }
 
 func getArgs(req mcp.CallToolRequest) map[string]interface{} {
@@ -151,7 +154,7 @@ func makeListIssuesHandler(client *api.Client) server.ToolHandlerFunc {
 		args := getArgs(req)
 
 		params := api.IssueListParams{
-			ProjectID:    getIntArg(args, "project_id"),
+			ProjectID:    getStringArg(args, "project_id"),
 			StatusID:     getStringArg(args, "status_id"),
 			AssignedToID: getStringArg(args, "assigned_to_id"),
 			TrackerID:    getIntArg(args, "tracker_id"),
@@ -169,7 +172,11 @@ func makeListIssuesHandler(client *api.Client) server.ToolHandlerFunc {
 			TotalCount int         `json:"total_count"`
 		}{Issues: issues, TotalCount: total}
 
-		return mcp.NewToolResultText(toJSON(result)), nil
+		text, err := toJSON(result)
+		if err != nil {
+			return mcp.NewToolResultError(err.Error()), nil
+		}
+		return mcp.NewToolResultText(text), nil
 	}
 }
 
@@ -187,7 +194,11 @@ func makeGetIssueHandler(client *api.Client) server.ToolHandlerFunc {
 			return mcp.NewToolResultError(err.Error()), nil
 		}
 
-		return mcp.NewToolResultText(toJSON(issue)), nil
+		text, err := toJSON(issue)
+		if err != nil {
+			return mcp.NewToolResultError(err.Error()), nil
+		}
+		return mcp.NewToolResultText(text), nil
 	}
 }
 
@@ -195,18 +206,23 @@ func makeCreateIssueHandler(client *api.Client) server.ToolHandlerFunc {
 	return func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 		args := getArgs(req)
 
-		projectID := getIntArg(args, "project_id")
+		projectID := getStringArg(args, "project_id")
 		subject := getStringArg(args, "subject")
 
-		if projectID == 0 {
+		if projectID == "" {
 			return mcp.NewToolResultError("project_id is required"), nil
 		}
 		if subject == "" {
 			return mcp.NewToolResultError("subject is required"), nil
 		}
 
+		var parsedProjectID interface{} = projectID
+		if id, err := strconv.Atoi(projectID); err == nil {
+			parsedProjectID = id
+		}
+
 		params := api.IssueCreateParams{
-			ProjectID:    projectID,
+			ProjectID:    parsedProjectID,
 			Subject:      subject,
 			Description:  getStringArg(args, "description"),
 			TrackerID:    getIntArg(args, "tracker_id"),
@@ -219,7 +235,11 @@ func makeCreateIssueHandler(client *api.Client) server.ToolHandlerFunc {
 			return mcp.NewToolResultError(err.Error()), nil
 		}
 
-		return mcp.NewToolResultText(toJSON(issue)), nil
+		text, err := toJSON(issue)
+		if err != nil {
+			return mcp.NewToolResultError(err.Error()), nil
+		}
+		return mcp.NewToolResultText(text), nil
 	}
 }
 
@@ -245,7 +265,14 @@ func makeUpdateIssueHandler(client *api.Client) server.ToolHandlerFunc {
 			return mcp.NewToolResultError(err.Error()), nil
 		}
 
-		return mcp.NewToolResultText(fmt.Sprintf(`{"status":"ok","message":"Updated issue #%d"}`, id)), nil
+		text, err := toJSON(struct {
+			Status  string `json:"status"`
+			Message string `json:"message"`
+		}{Status: "ok", Message: fmt.Sprintf("Updated issue #%d", id)})
+		if err != nil {
+			return mcp.NewToolResultError(err.Error()), nil
+		}
+		return mcp.NewToolResultText(text), nil
 	}
 }
 
@@ -262,6 +289,13 @@ func makeDeleteIssueHandler(client *api.Client) server.ToolHandlerFunc {
 			return mcp.NewToolResultError(err.Error()), nil
 		}
 
-		return mcp.NewToolResultText(fmt.Sprintf(`{"status":"ok","message":"Deleted issue #%d"}`, id)), nil
+		text, err := toJSON(struct {
+			Status  string `json:"status"`
+			Message string `json:"message"`
+		}{Status: "ok", Message: fmt.Sprintf("Deleted issue #%d", id)})
+		if err != nil {
+			return mcp.NewToolResultError(err.Error()), nil
+		}
+		return mcp.NewToolResultText(text), nil
 	}
 }

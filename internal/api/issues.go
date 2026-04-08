@@ -28,8 +28,8 @@ type issueUpdateRequest struct {
 
 func (c *Client) ListIssues(ctx context.Context, params IssueListParams) ([]Issue, int, error) {
 	q := url.Values{}
-	if params.ProjectID != 0 {
-		q.Set("project_id", strconv.Itoa(params.ProjectID))
+	if params.ProjectID != "" {
+		q.Set("project_id", params.ProjectID)
 	}
 	if params.StatusID != "" {
 		q.Set("status_id", params.StatusID)

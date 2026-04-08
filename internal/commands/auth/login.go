@@ -22,13 +22,19 @@ func NewCmdLogin(f *cmdutil.Factory) *cobra.Command {
 
 			if url == "" {
 				fmt.Fprint(f.IO.Out, "Redmine URL: ")
-				input, _ := reader.ReadString('\n')
+				input, err := reader.ReadString('\n')
+				if err != nil {
+					return fmt.Errorf("reading URL input: %w", err)
+				}
 				url = strings.TrimSpace(input)
 			}
 
 			if apiKey == "" {
 				fmt.Fprint(f.IO.Out, "API Key: ")
-				input, _ := reader.ReadString('\n')
+				input, err := reader.ReadString('\n')
+				if err != nil {
+					return fmt.Errorf("reading API key input: %w", err)
+				}
 				apiKey = strings.TrimSpace(input)
 			}
 

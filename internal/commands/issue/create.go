@@ -1,9 +1,9 @@
 package issue
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
+	"strconv"
 
 	"github.com/nbifrye/rmn/internal/api"
 	"github.com/nbifrye/rmn/internal/cmdutil"
@@ -11,15 +11,16 @@ import (
 )
 
 func NewCmdCreate(f *cmdutil.Factory) *cobra.Command {
-	var projectID, trackerID, priorityID, assignedToID int
-	var subject, description string
+	var trackerID, priorityID, assignedToID int
+	var projectID, subject, description string
 
 	cmd := &cobra.Command{
-		Use:   "create",
-		Short: "Create an issue",
+		Use:     "create",
+		Aliases: []string{"new"},
+		Short:   "Create an issue",
 		Long:  "Create a new Redmine issue.",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			if projectID == 0 {
+			if projectID == "" {
 				return fmt.Errorf("--project is required")
 			}
 			if subject == "" {
@@ -31,8 +32,13 @@ func NewCmdCreate(f *cmdutil.Factory) *cobra.Command {
 				return err
 			}
 
+			var parsedProjectID interface{} = projectID
+			if id, err := strconv.Atoi(projectID); err == nil {
+				parsedProjectID = id
+			}
+
 			params := api.IssueCreateParams{
-				ProjectID:    projectID,
+				ProjectID:    parsedProjectID,
 				TrackerID:    trackerID,
 				PriorityID:   priorityID,
 				Subject:      subject,
@@ -40,14 +46,17 @@ func NewCmdCreate(f *cmdutil.Factory) *cobra.Command {
 				AssignedToID: assignedToID,
 			}
 
-			issue, err := client.CreateIssue(context.Background(), params)
+			issue, err := client.CreateIssue(cmd.Context(), params)
 			if err != nil {
 				return err
 			}
 
 			output, _ := cmd.Root().PersistentFlags().GetString("output")
 			if output == "json" {
-				data, _ := json.MarshalIndent(issue, "", "  ")
+				data, err := json.MarshalIndent(issue, "", "  ")
+				if err != nil {
+					return fmt.Errorf("marshaling JSON: %w", err)
+				}
 				fmt.Fprintln(f.IO.Out, string(data))
 				return nil
 			}
@@ -57,7 +66,7 @@ func NewCmdCreate(f *cmdutil.Factory) *cobra.Command {
 		},
 	}
 
-	cmd.Flags().IntVarP(&projectID, "project", "p", 0, "Project ID (required)")
+	cmd.Flags().StringVarP(&projectID, "project", "p", "", "Project ID or identifier (required)")
 	cmd.Flags().StringVarP(&subject, "subject", "s", "", "Issue subject (required)")
 	cmd.Flags().StringVarP(&description, "description", "d", "", "Issue description")
 	cmd.Flags().IntVarP(&trackerID, "tracker", "t", 0, "Tracker ID")

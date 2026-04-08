@@ -1,7 +1,6 @@
 package auth
 
 import (
-	"context"
 	"fmt"
 
 	"github.com/nbifrye/rmn/internal/cmdutil"
@@ -39,7 +38,7 @@ func NewCmdStatus(f *cmdutil.Factory) *cobra.Command {
 				} `json:"user"`
 			}
 
-			err = client.Get(context.Background(), "/users/current.json", nil, &result)
+			err = client.Get(cmd.Context(), "/users/current.json", nil, &result)
 			if err != nil {
 				fmt.Fprintf(f.IO.ErrOut, "Connection failed: %v\n", err)
 				return nil
