@@ -130,6 +130,7 @@ func TestUpdateIssue(t *testing.T) {
 	err := c.UpdateIssue(context.Background(), 42, IssueUpdateParams{
 		Notes: "Updated via test",
 	})
+
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}

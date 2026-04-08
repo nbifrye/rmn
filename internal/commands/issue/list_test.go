@@ -8,25 +8,7 @@ import (
 	"testing"
 
 	"github.com/nbifrye/rmn/internal/api"
-	"github.com/nbifrye/rmn/internal/cmdutil"
-	"github.com/nbifrye/rmn/internal/config"
 )
-
-func newTestFactory(srv *httptest.Server) *cmdutil.Factory {
-	return &cmdutil.Factory{
-		Config: func() (*config.Config, error) {
-			return &config.Config{RedmineURL: srv.URL, APIKey: "test"}, nil
-		},
-		APIClient: func() (*api.Client, error) {
-			return api.NewClient(srv.URL, "test"), nil
-		},
-		IO: &cmdutil.IOStreams{
-			In:     &bytes.Buffer{},
-			Out:    &bytes.Buffer{},
-			ErrOut: &bytes.Buffer{},
-		},
-	}
-}
 
 func TestListCommand_TableOutput(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -46,9 +28,7 @@ func TestListCommand_TableOutput(t *testing.T) {
 
 	f := newTestFactory(srv)
 	cmd := NewCmdList(f)
-	cmd.Root().PersistentFlags().String("output", "table", "")
-	cmd.Root().PersistentFlags().String("redmine-url", "", "")
-	cmd.Root().PersistentFlags().String("api-key", "", "")
+	setupRootFlags(cmd, "table")
 
 	err := cmd.Execute()
 	if err != nil {
@@ -82,9 +62,7 @@ func TestListCommand_JSONOutput(t *testing.T) {
 
 	f := newTestFactory(srv)
 	cmd := NewCmdList(f)
-	cmd.Root().PersistentFlags().String("output", "json", "")
-	cmd.Root().PersistentFlags().String("redmine-url", "", "")
-	cmd.Root().PersistentFlags().String("api-key", "", "")
+	setupRootFlags(cmd, "json")
 
 	err := cmd.Execute()
 	if err != nil {
@@ -119,9 +97,7 @@ func TestListCommand_EmptyResult(t *testing.T) {
 
 	f := newTestFactory(srv)
 	cmd := NewCmdList(f)
-	cmd.Root().PersistentFlags().String("output", "table", "")
-	cmd.Root().PersistentFlags().String("redmine-url", "", "")
-	cmd.Root().PersistentFlags().String("api-key", "", "")
+	setupRootFlags(cmd, "table")
 
 	err := cmd.Execute()
 	if err != nil {
