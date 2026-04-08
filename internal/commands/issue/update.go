@@ -40,7 +40,7 @@ func NewCmdUpdate(f *cmdutil.Factory) *cobra.Command {
 				changed = true
 			}
 			if cmd.Flags().Changed("subject") {
-				params.Subject = subject
+				params.Subject = api.StringPtr(subject)
 				changed = true
 			}
 			if cmd.Flags().Changed("description") {
@@ -68,6 +68,21 @@ func NewCmdUpdate(f *cmdutil.Factory) *cobra.Command {
 
 			if err := client.UpdateIssue(cmd.Context(), id, params); err != nil {
 				return err
+			}
+
+			// GetString cannot error for flags defined on the root command.
+			output, _ := cmd.Root().PersistentFlags().GetString("output")
+			if output == "json" {
+				data, err := marshalJSON(struct {
+					Status  string `json:"status"`
+					ID      int    `json:"id"`
+					Message string `json:"message"`
+				}{Status: "ok", ID: id, Message: fmt.Sprintf("Updated issue #%d", id)})
+				if err != nil {
+					return err
+				}
+				fmt.Fprintln(f.IO.Out, string(data))
+				return nil
 			}
 
 			fmt.Fprintf(f.IO.Out, "Updated issue #%d\n", id)

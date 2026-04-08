@@ -76,6 +76,39 @@ func TestCloseCommand_CustomStatusAndNotes(t *testing.T) {
 	}
 }
 
+func TestCloseCommand_JSONOutput(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusNoContent)
+	}))
+	defer srv.Close()
+
+	f := newTestFactory(srv)
+	cmd := NewCmdClose(f)
+	setupRootFlags(cmd, "json")
+	cmd.SetArgs([]string{"10"})
+
+	err := cmd.Execute()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	out := f.IO.Out.(*bytes.Buffer).String()
+	var result struct {
+		Status  string `json:"status"`
+		ID      int    `json:"id"`
+		Message string `json:"message"`
+	}
+	if err := json.Unmarshal([]byte(out), &result); err != nil {
+		t.Fatalf("expected valid JSON, got: %s", out)
+	}
+	if result.Status != "ok" {
+		t.Errorf("expected status 'ok', got %q", result.Status)
+	}
+	if result.ID != 10 {
+		t.Errorf("expected id 10, got %d", result.ID)
+	}
+}
+
 func TestCloseCommand_APIClientError(t *testing.T) {
 	f := &cmdutil.Factory{
 		Config: func() (*config.Config, error) { return &config.Config{}, nil },

@@ -319,7 +319,7 @@ func makeUpdateIssueHandler(client *api.Client) server.ToolHandlerFunc {
 		}
 
 		params := api.IssueUpdateParams{
-			Subject:      getStringArg(args, "subject"),
+			Subject:      getStringPtrArg(args, "subject"),
 			Notes:        getStringArg(args, "notes"),
 			Description:  getStringPtrArg(args, "description"),
 			StatusID:     getIntPtrArg(args, "status_id"),

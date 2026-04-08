@@ -1,7 +1,6 @@
 package issue
 
 import (
-	"encoding/json"
 	"fmt"
 	"strconv"
 
@@ -51,9 +50,13 @@ func NewCmdCreate(f *cmdutil.Factory) *cobra.Command {
 				return err
 			}
 
+			// GetString cannot error for flags defined on the root command.
 			output, _ := cmd.Root().PersistentFlags().GetString("output")
 			if output == "json" {
-				data, _ := json.MarshalIndent(issue, "", "  ")
+				data, err := marshalJSON(issue)
+				if err != nil {
+					return err
+				}
 				fmt.Fprintln(f.IO.Out, string(data))
 				return nil
 			}
