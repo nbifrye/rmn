@@ -24,11 +24,22 @@ func NewCmdStatus(f *cmdutil.Factory) *cobra.Command {
 			}
 
 			fmt.Fprintf(f.IO.Out, "Redmine URL: %s\n", cfg.RedmineURL)
-			fmt.Fprintf(f.IO.Out, "API Key:     %s***\n", cfg.APIKey[:min(4, len(cfg.APIKey))])
+			if len(cfg.APIKey) > 4 {
+				fmt.Fprintf(f.IO.Out, "API Key:     %s***\n", cfg.APIKey[:4])
+			} else if cfg.APIKey != "" {
+				fmt.Fprintln(f.IO.Out, "API Key:     ***")
+			} else {
+				fmt.Fprintln(f.IO.Out, "API Key:     (not set)")
+			}
+
+			if cfg.APIKey == "" {
+				return nil
+			}
 
 			client, err := f.APIClient()
 			if err != nil {
-				return err
+				fmt.Fprintf(f.IO.ErrOut, "Connection failed: %v\n", err)
+				return nil
 			}
 
 			var result struct {

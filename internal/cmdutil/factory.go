@@ -1,6 +1,8 @@
 package cmdutil
 
 import (
+	"fmt"
+
 	"github.com/nbifrye/rmn/internal/api"
 	"github.com/nbifrye/rmn/internal/config"
 )
@@ -40,6 +42,9 @@ func NewFactory() *Factory {
 		}
 		if f.flagAPIKey != "" {
 			cfg.APIKey = f.flagAPIKey
+		}
+		if cfg.RedmineURL == "" || cfg.APIKey == "" {
+			return nil, fmt.Errorf("not configured: run 'rmn auth login' to set up authentication")
 		}
 		return api.NewClient(cfg.RedmineURL, cfg.APIKey), nil
 	}

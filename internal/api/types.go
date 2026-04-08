@@ -34,15 +34,22 @@ type IssueCreateParams struct {
 }
 
 // IssueUpdateParams holds parameters for updating an issue.
+// Pointer fields distinguish "not provided" (nil) from "set to zero value".
 type IssueUpdateParams struct {
-	TrackerID    int    `json:"tracker_id,omitempty"`
-	StatusID     int    `json:"status_id,omitempty"`
-	PriorityID   int    `json:"priority_id,omitempty"`
-	Subject      string `json:"subject,omitempty"`
-	Description  string `json:"description,omitempty"`
-	AssignedToID int    `json:"assigned_to_id,omitempty"`
-	Notes        string `json:"notes,omitempty"`
+	TrackerID    *int    `json:"tracker_id,omitempty"`
+	StatusID     *int    `json:"status_id,omitempty"`
+	PriorityID   *int    `json:"priority_id,omitempty"`
+	Subject      string  `json:"subject,omitempty"`
+	Description  *string `json:"description,omitempty"`
+	AssignedToID *int    `json:"assigned_to_id,omitempty"`
+	Notes        string  `json:"notes,omitempty"`
 }
+
+// IntPtr returns a pointer to the given int value.
+func IntPtr(v int) *int { return &v }
+
+// StringPtr returns a pointer to the given string value.
+func StringPtr(v string) *string { return &v }
 
 // IssueListParams holds parameters for listing issues.
 // ProjectID accepts both numeric IDs and string identifiers (e.g. "my-project").

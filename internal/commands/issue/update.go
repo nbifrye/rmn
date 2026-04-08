@@ -24,19 +24,46 @@ func NewCmdUpdate(f *cmdutil.Factory) *cobra.Command {
 				return fmt.Errorf("invalid issue ID: %s", args[0])
 			}
 
+			params := api.IssueUpdateParams{}
+			changed := false
+
+			if cmd.Flags().Changed("status") {
+				params.StatusID = api.IntPtr(statusID)
+				changed = true
+			}
+			if cmd.Flags().Changed("tracker") {
+				params.TrackerID = api.IntPtr(trackerID)
+				changed = true
+			}
+			if cmd.Flags().Changed("priority") {
+				params.PriorityID = api.IntPtr(priorityID)
+				changed = true
+			}
+			if cmd.Flags().Changed("subject") {
+				params.Subject = subject
+				changed = true
+			}
+			if cmd.Flags().Changed("description") {
+				params.Description = api.StringPtr(description)
+				changed = true
+			}
+			if cmd.Flags().Changed("assignee") {
+				params.AssignedToID = api.IntPtr(assignedToID)
+				changed = true
+			}
+			if cmd.Flags().Changed("notes") {
+				params.Notes = notes
+				changed = true
+			}
+
+			if !changed {
+				fmt.Fprintln(f.IO.ErrOut, "No fields specified. Use flags to set fields to update.")
+				return nil
+			}
+
 			client, err := f.APIClient()
 			if err != nil {
 				return err
-			}
-
-			params := api.IssueUpdateParams{
-				StatusID:     statusID,
-				TrackerID:    trackerID,
-				PriorityID:   priorityID,
-				Subject:      subject,
-				Description:  description,
-				AssignedToID: assignedToID,
-				Notes:        notes,
 			}
 
 			if err := client.UpdateIssue(cmd.Context(), id, params); err != nil {

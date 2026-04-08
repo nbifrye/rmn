@@ -32,8 +32,10 @@ func NewCmdClose(f *cmdutil.Factory) *cobra.Command {
 			}
 
 			params := api.IssueUpdateParams{
-				StatusID: statusID,
-				Notes:    notes,
+				StatusID: api.IntPtr(statusID),
+			}
+			if cmd.Flags().Changed("notes") {
+				params.Notes = notes
 			}
 
 			if err := client.UpdateIssue(cmd.Context(), id, params); err != nil {

@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
+	"time"
 )
 
 type Client struct {
@@ -21,7 +22,7 @@ func NewClient(baseURL, apiKey string) *Client {
 	return &Client{
 		BaseURL:    strings.TrimRight(baseURL, "/"),
 		APIKey:     apiKey,
-		HTTPClient: &http.Client{},
+		HTTPClient: &http.Client{Timeout: 30 * time.Second},
 	}
 }
 
