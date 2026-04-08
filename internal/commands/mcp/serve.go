@@ -24,6 +24,11 @@ func NewCmdMcp(f *cmdutil.Factory, version string) *cobra.Command {
 	return cmd
 }
 
+// serveStdioFunc is the function used to start the MCP server. It can be replaced in tests.
+var serveStdioFunc = func(s *server.MCPServer) error {
+	return server.ServeStdio(s)
+}
+
 func newCmdServe(f *cmdutil.Factory, version string) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "serve",
@@ -38,7 +43,7 @@ func newCmdServe(f *cmdutil.Factory, version string) *cobra.Command {
 			s := server.NewMCPServer("rmn-redmine", version)
 			registerTools(s, client)
 
-			return server.ServeStdio(s)
+			return serveStdioFunc(s)
 		},
 	}
 
@@ -132,6 +137,9 @@ func registerTools(s *server.MCPServer, client *api.Client) {
 		makeDeleteIssueHandler(client),
 	)
 }
+
+// toJSONFunc is used by MCP handlers to marshal results. It can be replaced in tests.
+var toJSONFunc = toJSON
 
 func toJSON(v interface{}) (string, error) {
 	data, err := json.MarshalIndent(v, "", "  ")
@@ -232,7 +240,7 @@ func makeListIssuesHandler(client *api.Client) server.ToolHandlerFunc {
 			TotalCount int         `json:"total_count"`
 		}{Issues: issues, TotalCount: total}
 
-		text, err := toJSON(result)
+		text, err := toJSONFunc(result)
 		if err != nil {
 			return mcp.NewToolResultError(err.Error()), nil
 		}
@@ -254,7 +262,7 @@ func makeGetIssueHandler(client *api.Client) server.ToolHandlerFunc {
 			return mcp.NewToolResultError(err.Error()), nil
 		}
 
-		text, err := toJSON(issue)
+		text, err := toJSONFunc(issue)
 		if err != nil {
 			return mcp.NewToolResultError(err.Error()), nil
 		}
@@ -295,7 +303,7 @@ func makeCreateIssueHandler(client *api.Client) server.ToolHandlerFunc {
 			return mcp.NewToolResultError(err.Error()), nil
 		}
 
-		text, err := toJSON(issue)
+		text, err := toJSONFunc(issue)
 		if err != nil {
 			return mcp.NewToolResultError(err.Error()), nil
 		}
@@ -325,7 +333,7 @@ func makeUpdateIssueHandler(client *api.Client) server.ToolHandlerFunc {
 			return mcp.NewToolResultError(err.Error()), nil
 		}
 
-		text, err := toJSON(struct {
+		text, err := toJSONFunc(struct {
 			Status  string `json:"status"`
 			Message string `json:"message"`
 		}{Status: "ok", Message: fmt.Sprintf("Updated issue #%d", id)})
@@ -349,7 +357,7 @@ func makeDeleteIssueHandler(client *api.Client) server.ToolHandlerFunc {
 			return mcp.NewToolResultError(err.Error()), nil
 		}
 
-		text, err := toJSON(struct {
+		text, err := toJSONFunc(struct {
 			Status  string `json:"status"`
 			Message string `json:"message"`
 		}{Status: "ok", Message: fmt.Sprintf("Deleted issue #%d", id)})

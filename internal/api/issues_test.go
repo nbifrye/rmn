@@ -178,6 +178,78 @@ func TestListIssues_EmptyResult(t *testing.T) {
 	}
 }
 
+func TestListIssues_AllParams(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Query().Get("assigned_to_id") != "me" {
+			t.Errorf("expected assigned_to_id=me, got %s", r.URL.Query().Get("assigned_to_id"))
+		}
+		if r.URL.Query().Get("tracker_id") != "2" {
+			t.Errorf("expected tracker_id=2, got %s", r.URL.Query().Get("tracker_id"))
+		}
+		if r.URL.Query().Get("offset") != "10" {
+			t.Errorf("expected offset=10, got %s", r.URL.Query().Get("offset"))
+		}
+		resp := issuesResponse{Issues: []Issue{}, TotalCount: 0}
+		json.NewEncoder(w).Encode(resp)
+	}))
+	defer srv.Close()
+
+	c := NewClient(srv.URL, "key")
+	_, _, err := c.ListIssues(context.Background(), IssueListParams{
+		AssignedToID: "me",
+		TrackerID:    2,
+		Offset:       10,
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestListIssues_Error(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusInternalServerError)
+		w.Write([]byte(`{"errors":["Server error"]}`))
+	}))
+	defer srv.Close()
+
+	c := NewClient(srv.URL, "key")
+	_, _, err := c.ListIssues(context.Background(), IssueListParams{})
+	if err == nil {
+		t.Fatal("expected error for server error")
+	}
+}
+
+func TestGetIssue_Error(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusNotFound)
+		w.Write([]byte(`{"errors":["Not found"]}`))
+	}))
+	defer srv.Close()
+
+	c := NewClient(srv.URL, "key")
+	_, err := c.GetIssue(context.Background(), 999)
+	if err == nil {
+		t.Fatal("expected error for not found")
+	}
+}
+
+func TestCreateIssue_Error(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusUnprocessableEntity)
+		w.Write([]byte(`{"errors":["Validation failed"]}`))
+	}))
+	defer srv.Close()
+
+	c := NewClient(srv.URL, "key")
+	_, err := c.CreateIssue(context.Background(), IssueCreateParams{
+		ProjectID: 1,
+		Subject:   "test",
+	})
+	if err == nil {
+		t.Fatal("expected error for validation failure")
+	}
+}
+
 func TestCreateIssue_WithStringProjectID(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		var body map[string]interface{}

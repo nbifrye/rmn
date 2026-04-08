@@ -3,6 +3,7 @@ package auth
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -150,6 +151,52 @@ func TestStatusCommand_EmptyAPIKey(t *testing.T) {
 	out := f.IO.Out.(*bytes.Buffer).String()
 	if !bytes.Contains([]byte(out), []byte("(not set)")) {
 		t.Errorf("expected '(not set)' for empty key, got: %s", out)
+	}
+}
+
+func TestStatusCommand_ConfigError(t *testing.T) {
+	f := &cmdutil.Factory{
+		Config: func() (*config.Config, error) {
+			return nil, fmt.Errorf("config error")
+		},
+		IO: &cmdutil.IOStreams{
+			In:     &bytes.Buffer{},
+			Out:    &bytes.Buffer{},
+			ErrOut: &bytes.Buffer{},
+		},
+	}
+
+	cmd := NewCmdStatus(f)
+	err := cmd.Execute()
+	if err == nil {
+		t.Fatal("expected error for config failure")
+	}
+}
+
+func TestStatusCommand_APIClientError(t *testing.T) {
+	f := &cmdutil.Factory{
+		Config: func() (*config.Config, error) {
+			return &config.Config{RedmineURL: "https://example.com", APIKey: "some-key-12345"}, nil
+		},
+		APIClient: func() (*api.Client, error) {
+			return nil, fmt.Errorf("api client creation failed")
+		},
+		IO: &cmdutil.IOStreams{
+			In:     &bytes.Buffer{},
+			Out:    &bytes.Buffer{},
+			ErrOut: &bytes.Buffer{},
+		},
+	}
+
+	cmd := NewCmdStatus(f)
+	err := cmd.Execute()
+	if err != nil {
+		t.Fatalf("unexpected error (should log, not return): %v", err)
+	}
+
+	errOut := f.IO.ErrOut.(*bytes.Buffer).String()
+	if !bytes.Contains([]byte(errOut), []byte("Connection failed")) {
+		t.Errorf("expected connection failure in stderr, got: %s", errOut)
 	}
 }
 

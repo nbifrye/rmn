@@ -97,6 +97,77 @@ func TestLoginCommand_EmptyInput(t *testing.T) {
 	}
 }
 
+func TestLoginCommand_ReadURLError(t *testing.T) {
+	tmpDir := t.TempDir()
+	t.Setenv("XDG_CONFIG_HOME", tmpDir)
+
+	// Empty buffer causes EOF on ReadString
+	f := &cmdutil.Factory{
+		Config:    func() (*config.Config, error) { return &config.Config{}, nil },
+		APIClient: func() (*api.Client, error) { return nil, nil },
+		IO: &cmdutil.IOStreams{
+			In:     &bytes.Buffer{},
+			Out:    &bytes.Buffer{},
+			ErrOut: &bytes.Buffer{},
+		},
+	}
+
+	cmd := NewCmdLogin(f)
+	// No --url or --api-key flags, empty stdin causes EOF
+	err := cmd.Execute()
+	if err == nil {
+		t.Fatal("expected error for empty input")
+	}
+}
+
+func TestLoginCommand_ReadAPIKeyError(t *testing.T) {
+	tmpDir := t.TempDir()
+	t.Setenv("XDG_CONFIG_HOME", tmpDir)
+
+	// Provide URL but EOF on API key
+	f := &cmdutil.Factory{
+		Config:    func() (*config.Config, error) { return &config.Config{}, nil },
+		APIClient: func() (*api.Client, error) { return nil, nil },
+		IO: &cmdutil.IOStreams{
+			In:     bytes.NewBufferString("https://example.com\n"),
+			Out:    &bytes.Buffer{},
+			ErrOut: &bytes.Buffer{},
+		},
+	}
+
+	cmd := NewCmdLogin(f)
+	err := cmd.Execute()
+	if err == nil {
+		t.Fatal("expected error for missing API key input")
+	}
+}
+
+func TestLoginCommand_SaveError(t *testing.T) {
+	tmpDir := t.TempDir()
+	t.Setenv("XDG_CONFIG_HOME", tmpDir)
+
+	// Create a file where the directory should be, so MkdirAll fails during Save
+	os.WriteFile(filepath.Join(tmpDir, "rmn"), []byte("not a dir"), 0o644)
+
+	f := &cmdutil.Factory{
+		Config:    func() (*config.Config, error) { return &config.Config{}, nil },
+		APIClient: func() (*api.Client, error) { return nil, nil },
+		IO: &cmdutil.IOStreams{
+			In:     &bytes.Buffer{},
+			Out:    &bytes.Buffer{},
+			ErrOut: &bytes.Buffer{},
+		},
+	}
+
+	cmd := NewCmdLogin(f)
+	cmd.SetArgs([]string{"--url", "https://example.com", "--api-key", "key"})
+
+	err := cmd.Execute()
+	if err == nil {
+		t.Fatal("expected error for save failure")
+	}
+}
+
 func TestLoginCommand_TrimsTrailingSlash(t *testing.T) {
 	tmpDir := t.TempDir()
 	t.Setenv("XDG_CONFIG_HOME", tmpDir)

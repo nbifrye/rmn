@@ -1,7 +1,6 @@
 package issue
 
 import (
-	"encoding/json"
 	"fmt"
 	"strconv"
 
@@ -34,7 +33,7 @@ func NewCmdView(f *cmdutil.Factory) *cobra.Command {
 
 			output, _ := cmd.Root().PersistentFlags().GetString("output")
 			if output == "json" {
-				data, err := json.MarshalIndent(issue, "", "  ")
+				data, err := marshalJSON(issue, "", "  ")
 				if err != nil {
 					return fmt.Errorf("marshaling JSON: %w", err)
 				}

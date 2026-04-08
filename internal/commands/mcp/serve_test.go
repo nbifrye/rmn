@@ -1,6 +1,7 @@
 package mcp
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -11,6 +12,8 @@ import (
 	mcplib "github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
 	"github.com/nbifrye/rmn/internal/api"
+	"github.com/nbifrye/rmn/internal/cmdutil"
+	"github.com/nbifrye/rmn/internal/config"
 )
 
 func setupTestServer(t *testing.T) (*server.MCPServer, *httptest.Server) {
@@ -375,6 +378,448 @@ func TestToolAnnotations(t *testing.T) {
 				t.Errorf("idempotentHint: got %v, want %v", tool.IdempotentHint, tc.wantIdempotent)
 			}
 		})
+	}
+}
+
+func TestNewCmdMcp(t *testing.T) {
+	f := &cmdutil.Factory{
+		Config: func() (*config.Config, error) {
+			return &config.Config{}, nil
+		},
+		APIClient: func() (*api.Client, error) {
+			return nil, nil
+		},
+		IO: &cmdutil.IOStreams{
+			In:     &bytes.Buffer{},
+			Out:    &bytes.Buffer{},
+			ErrOut: &bytes.Buffer{},
+		},
+	}
+
+	cmd := NewCmdMcp(f, "test")
+	if cmd.Use != "mcp" {
+		t.Errorf("expected Use 'mcp', got %q", cmd.Use)
+	}
+
+	// Verify serve subcommand exists
+	found := false
+	for _, sub := range cmd.Commands() {
+		if sub.Name() == "serve" {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Error("expected 'serve' subcommand not found")
+	}
+}
+
+func TestNewCmdServe_Success(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {}))
+	defer srv.Close()
+
+	f := &cmdutil.Factory{
+		Config: func() (*config.Config, error) {
+			return &config.Config{RedmineURL: srv.URL, APIKey: "test"}, nil
+		},
+		APIClient: func() (*api.Client, error) {
+			return api.NewClient(srv.URL, "test"), nil
+		},
+		IO: &cmdutil.IOStreams{
+			In:     &bytes.Buffer{},
+			Out:    &bytes.Buffer{},
+			ErrOut: &bytes.Buffer{},
+		},
+	}
+
+	// Replace serveStdioFunc to avoid blocking on stdin
+	origServe := serveStdioFunc
+	serveStdioFunc = func(s *server.MCPServer) error { return nil }
+	defer func() { serveStdioFunc = origServe }()
+
+	cmd := newCmdServe(f, "test")
+	err := cmd.Execute()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestNewCmdServe_APIClientError(t *testing.T) {
+	f := &cmdutil.Factory{
+		Config: func() (*config.Config, error) {
+			return &config.Config{}, nil
+		},
+		APIClient: func() (*api.Client, error) {
+			return nil, fmt.Errorf("not configured")
+		},
+		IO: &cmdutil.IOStreams{
+			In:     &bytes.Buffer{},
+			Out:    &bytes.Buffer{},
+			ErrOut: &bytes.Buffer{},
+		},
+	}
+
+	cmd := newCmdServe(f, "test")
+	err := cmd.Execute()
+	if err == nil {
+		t.Fatal("expected error when API client fails")
+	}
+	if !bytes.Contains([]byte(err.Error()), []byte("not configured")) {
+		t.Errorf("unexpected error: %v", err)
+	}
+}
+
+func TestGetArgs_NonMap(t *testing.T) {
+	req := mcplib.CallToolRequest{}
+	req.Params.Arguments = "not a map"
+	args := getArgs(req)
+	if len(args) != 0 {
+		t.Errorf("expected empty map for non-map arguments, got %v", args)
+	}
+}
+
+func TestGetArgs_NilArguments(t *testing.T) {
+	req := mcplib.CallToolRequest{}
+	req.Params.Arguments = nil
+	args := getArgs(req)
+	if len(args) != 0 {
+		t.Errorf("expected empty map for nil arguments, got %v", args)
+	}
+}
+
+func TestGetIntArg_AllTypes(t *testing.T) {
+	args := map[string]interface{}{
+		"float":          42.0,
+		"int":            int(10),
+		"string":         "7",
+		"invalid_string": "abc",
+		"nil_val":        nil,
+		"bool":           true,
+	}
+
+	if v := getIntArg(args, "float"); v != 42 {
+		t.Errorf("float: expected 42, got %d", v)
+	}
+	if v := getIntArg(args, "int"); v != 10 {
+		t.Errorf("int: expected 10, got %d", v)
+	}
+	if v := getIntArg(args, "string"); v != 7 {
+		t.Errorf("string: expected 7, got %d", v)
+	}
+	if v := getIntArg(args, "invalid_string"); v != 0 {
+		t.Errorf("invalid_string: expected 0, got %d", v)
+	}
+	if v := getIntArg(args, "nil_val"); v != 0 {
+		t.Errorf("nil_val: expected 0, got %d", v)
+	}
+	if v := getIntArg(args, "missing"); v != 0 {
+		t.Errorf("missing: expected 0, got %d", v)
+	}
+	if v := getIntArg(args, "bool"); v != 0 {
+		t.Errorf("bool: expected 0, got %d", v)
+	}
+}
+
+func TestGetIntPtrArg_AllTypes(t *testing.T) {
+	args := map[string]interface{}{
+		"float":          42.0,
+		"int":            int(10),
+		"string":         "7",
+		"invalid_string": "abc",
+		"nil_val":        nil,
+		"bool":           true,
+	}
+
+	if v := getIntPtrArg(args, "float"); v == nil || *v != 42 {
+		t.Errorf("float: expected *42, got %v", v)
+	}
+	if v := getIntPtrArg(args, "int"); v == nil || *v != 10 {
+		t.Errorf("int: expected *10, got %v", v)
+	}
+	if v := getIntPtrArg(args, "string"); v == nil || *v != 7 {
+		t.Errorf("string: expected *7, got %v", v)
+	}
+	if v := getIntPtrArg(args, "invalid_string"); v != nil {
+		t.Errorf("invalid_string: expected nil, got %v", *v)
+	}
+	if v := getIntPtrArg(args, "nil_val"); v != nil {
+		t.Errorf("nil_val: expected nil, got %v", *v)
+	}
+	if v := getIntPtrArg(args, "missing"); v != nil {
+		t.Errorf("missing: expected nil, got %v", *v)
+	}
+	if v := getIntPtrArg(args, "bool"); v != nil {
+		t.Errorf("bool: expected nil, got %v", *v)
+	}
+}
+
+func TestToJSON_Error(t *testing.T) {
+	// Channels cannot be marshaled to JSON
+	_, err := toJSON(make(chan int))
+	if err == nil {
+		t.Fatal("expected error for unmarshalable value")
+	}
+}
+
+func TestListIssuesHandler_APIError(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusInternalServerError)
+		w.Write([]byte(`{"errors":["Server error"]}`))
+	}))
+	defer srv.Close()
+
+	client := api.NewClient(srv.URL, "test-key")
+	mcpServer := server.NewMCPServer("test", "0.1.0")
+	registerTools(mcpServer, client)
+
+	initMsg := `{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-03-26","capabilities":{},"clientInfo":{"name":"test","version":"1.0"}}}`
+	mcpServer.HandleMessage(context.Background(), json.RawMessage(initMsg))
+
+	text, isErr := callTool(t, mcpServer, "list_issues", map[string]interface{}{})
+	if !isErr {
+		t.Errorf("expected error result, got: %s", text)
+	}
+}
+
+func TestGetIssueHandler_APIError(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusNotFound)
+		w.Write([]byte(`{"errors":["Not found"]}`))
+	}))
+	defer srv.Close()
+
+	client := api.NewClient(srv.URL, "test-key")
+	mcpServer := server.NewMCPServer("test", "0.1.0")
+	registerTools(mcpServer, client)
+
+	initMsg := `{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-03-26","capabilities":{},"clientInfo":{"name":"test","version":"1.0"}}}`
+	mcpServer.HandleMessage(context.Background(), json.RawMessage(initMsg))
+
+	text, isErr := callTool(t, mcpServer, "get_issue", map[string]interface{}{"issue_id": 999})
+	if !isErr {
+		t.Errorf("expected error result, got: %s", text)
+	}
+}
+
+func TestCreateIssueHandler_APIError(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusUnprocessableEntity)
+		w.Write([]byte(`{"errors":["Subject cannot be blank"]}`))
+	}))
+	defer srv.Close()
+
+	client := api.NewClient(srv.URL, "test-key")
+	mcpServer := server.NewMCPServer("test", "0.1.0")
+	registerTools(mcpServer, client)
+
+	initMsg := `{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-03-26","capabilities":{},"clientInfo":{"name":"test","version":"1.0"}}}`
+	mcpServer.HandleMessage(context.Background(), json.RawMessage(initMsg))
+
+	text, isErr := callTool(t, mcpServer, "create_issue", map[string]interface{}{
+		"project_id": "test",
+		"subject":    "test",
+	})
+	if !isErr {
+		t.Errorf("expected error result, got: %s", text)
+	}
+}
+
+func TestCreateIssueHandler_NumericProjectID(t *testing.T) {
+	s, srv := setupTestServer(t)
+	defer srv.Close()
+
+	text, isErr := callTool(t, s, "create_issue", map[string]interface{}{
+		"project_id": "1",
+		"subject":    "Numeric project",
+	})
+	if isErr {
+		t.Fatalf("unexpected error: %s", text)
+	}
+}
+
+func TestUpdateIssueHandler_MissingID(t *testing.T) {
+	s, srv := setupTestServer(t)
+	defer srv.Close()
+
+	text, isErr := callTool(t, s, "update_issue", map[string]interface{}{})
+	if !isErr {
+		t.Errorf("expected error result, got: %s", text)
+	}
+	if text != "issue_id is required" {
+		t.Errorf("unexpected error: %s", text)
+	}
+}
+
+func TestUpdateIssueHandler_APIError(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusNotFound)
+		w.Write([]byte(`{"errors":["Not found"]}`))
+	}))
+	defer srv.Close()
+
+	client := api.NewClient(srv.URL, "test-key")
+	mcpServer := server.NewMCPServer("test", "0.1.0")
+	registerTools(mcpServer, client)
+
+	initMsg := `{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-03-26","capabilities":{},"clientInfo":{"name":"test","version":"1.0"}}}`
+	mcpServer.HandleMessage(context.Background(), json.RawMessage(initMsg))
+
+	text, isErr := callTool(t, mcpServer, "update_issue", map[string]interface{}{
+		"issue_id": 42,
+		"notes":    "test",
+	})
+	if !isErr {
+		t.Errorf("expected error result, got: %s", text)
+	}
+}
+
+func TestDeleteIssueHandler_APIError(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusNotFound)
+		w.Write([]byte(`{"errors":["Not found"]}`))
+	}))
+	defer srv.Close()
+
+	client := api.NewClient(srv.URL, "test-key")
+	mcpServer := server.NewMCPServer("test", "0.1.0")
+	registerTools(mcpServer, client)
+
+	initMsg := `{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-03-26","capabilities":{},"clientInfo":{"name":"test","version":"1.0"}}}`
+	mcpServer.HandleMessage(context.Background(), json.RawMessage(initMsg))
+
+	text, isErr := callTool(t, mcpServer, "delete_issue", map[string]interface{}{
+		"issue_id": 999,
+	})
+	if !isErr {
+		t.Errorf("expected error result, got: %s", text)
+	}
+}
+
+func TestUpdateIssueHandler_WithAllFields(t *testing.T) {
+	s, srv := setupTestServer(t)
+	defer srv.Close()
+
+	text, isErr := callTool(t, s, "update_issue", map[string]interface{}{
+		"issue_id":       42,
+		"subject":        "Updated subject",
+		"description":    "New description",
+		"status_id":      3,
+		"priority_id":    2,
+		"assigned_to_id": 5,
+		"notes":          "A note",
+	})
+	if isErr {
+		t.Fatalf("unexpected error: %s", text)
+	}
+}
+
+func TestCreateIssueHandler_WithAllFields(t *testing.T) {
+	s, srv := setupTestServer(t)
+	defer srv.Close()
+
+	text, isErr := callTool(t, s, "create_issue", map[string]interface{}{
+		"project_id":     "test",
+		"subject":        "Full issue",
+		"description":    "Desc",
+		"tracker_id":     1,
+		"priority_id":    2,
+		"assigned_to_id": 3,
+	})
+	if isErr {
+		t.Fatalf("unexpected error: %s", text)
+	}
+}
+
+func TestListIssuesHandler_WithAllParams(t *testing.T) {
+	s, srv := setupTestServer(t)
+	defer srv.Close()
+
+	text, isErr := callTool(t, s, "list_issues", map[string]interface{}{
+		"project_id":      "test",
+		"status_id":       "open",
+		"assigned_to_id":  "me",
+		"tracker_id":      1,
+		"limit":           10,
+		"offset":          5,
+	})
+	if isErr {
+		t.Fatalf("unexpected error: %s", text)
+	}
+}
+
+func TestListIssuesHandler_ToJSONError(t *testing.T) {
+	origToJSON := toJSONFunc
+	toJSONFunc = func(v interface{}) (string, error) { return "", fmt.Errorf("marshal error") }
+	defer func() { toJSONFunc = origToJSON }()
+
+	s, srv := setupTestServer(t)
+	defer srv.Close()
+
+	text, isErr := callTool(t, s, "list_issues", map[string]interface{}{})
+	if !isErr {
+		t.Errorf("expected error result, got: %s", text)
+	}
+}
+
+func TestGetIssueHandler_ToJSONError(t *testing.T) {
+	origToJSON := toJSONFunc
+	toJSONFunc = func(v interface{}) (string, error) { return "", fmt.Errorf("marshal error") }
+	defer func() { toJSONFunc = origToJSON }()
+
+	s, srv := setupTestServer(t)
+	defer srv.Close()
+
+	text, isErr := callTool(t, s, "get_issue", map[string]interface{}{"issue_id": 42})
+	if !isErr {
+		t.Errorf("expected error result, got: %s", text)
+	}
+}
+
+func TestCreateIssueHandler_ToJSONError(t *testing.T) {
+	origToJSON := toJSONFunc
+	toJSONFunc = func(v interface{}) (string, error) { return "", fmt.Errorf("marshal error") }
+	defer func() { toJSONFunc = origToJSON }()
+
+	s, srv := setupTestServer(t)
+	defer srv.Close()
+
+	text, isErr := callTool(t, s, "create_issue", map[string]interface{}{
+		"project_id": "test",
+		"subject":    "test",
+	})
+	if !isErr {
+		t.Errorf("expected error result, got: %s", text)
+	}
+}
+
+func TestUpdateIssueHandler_ToJSONError(t *testing.T) {
+	origToJSON := toJSONFunc
+	toJSONFunc = func(v interface{}) (string, error) { return "", fmt.Errorf("marshal error") }
+	defer func() { toJSONFunc = origToJSON }()
+
+	s, srv := setupTestServer(t)
+	defer srv.Close()
+
+	text, isErr := callTool(t, s, "update_issue", map[string]interface{}{
+		"issue_id": 42,
+		"notes":    "test",
+	})
+	if !isErr {
+		t.Errorf("expected error result, got: %s", text)
+	}
+}
+
+func TestDeleteIssueHandler_ToJSONError(t *testing.T) {
+	origToJSON := toJSONFunc
+	toJSONFunc = func(v interface{}) (string, error) { return "", fmt.Errorf("marshal error") }
+	defer func() { toJSONFunc = origToJSON }()
+
+	s, srv := setupTestServer(t)
+	defer srv.Close()
+
+	text, isErr := callTool(t, s, "delete_issue", map[string]interface{}{"issue_id": 42})
+	if !isErr {
+		t.Errorf("expected error result, got: %s", text)
 	}
 }
 

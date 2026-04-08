@@ -3,11 +3,14 @@ package issue
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 
 	"github.com/nbifrye/rmn/internal/api"
+	"github.com/nbifrye/rmn/internal/cmdutil"
+	"github.com/nbifrye/rmn/internal/config"
 )
 
 func TestUpdateCommand_WithFlags(t *testing.T) {
@@ -82,6 +85,79 @@ func TestUpdateCommand_InvalidID(t *testing.T) {
 	err := cmd.Execute()
 	if err == nil {
 		t.Fatal("expected error for invalid ID")
+	}
+}
+
+func TestUpdateCommand_AllFlags(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var body struct {
+			Issue map[string]interface{} `json:"issue"`
+		}
+		json.NewDecoder(r.Body).Decode(&body)
+		if body.Issue["subject"] != "New subject" {
+			t.Errorf("expected subject, got %v", body.Issue["subject"])
+		}
+		if body.Issue["notes"] != "A note" {
+			t.Errorf("expected notes, got %v", body.Issue["notes"])
+		}
+		w.WriteHeader(http.StatusNoContent)
+	}))
+	defer srv.Close()
+
+	f := newTestFactory(srv)
+	cmd := NewCmdUpdate(f)
+	setupRootFlags(cmd, "table")
+	cmd.SetArgs([]string{"42",
+		"--status", "3",
+		"--tracker", "2",
+		"--priority", "1",
+		"--subject", "New subject",
+		"--description", "New description",
+		"--assignee", "5",
+		"--notes", "A note",
+	})
+
+	err := cmd.Execute()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestUpdateCommand_APIClientError(t *testing.T) {
+	f := &cmdutil.Factory{
+		Config: func() (*config.Config, error) { return &config.Config{}, nil },
+		APIClient: func() (*api.Client, error) {
+			return nil, fmt.Errorf("not configured")
+		},
+		IO: &cmdutil.IOStreams{
+			In: &bytes.Buffer{}, Out: &bytes.Buffer{}, ErrOut: &bytes.Buffer{},
+		},
+	}
+
+	cmd := NewCmdUpdate(f)
+	setupRootFlags(cmd, "table")
+	cmd.SetArgs([]string{"42", "--status", "3"})
+	err := cmd.Execute()
+	if err == nil {
+		t.Fatal("expected error for API client failure")
+	}
+}
+
+func TestUpdateCommand_APIError(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusInternalServerError)
+		w.Write([]byte(`{"errors":["Server error"]}`))
+	}))
+	defer srv.Close()
+
+	f := newTestFactory(srv)
+	cmd := NewCmdUpdate(f)
+	setupRootFlags(cmd, "table")
+	cmd.SetArgs([]string{"42", "--status", "3"})
+
+	err := cmd.Execute()
+	if err == nil {
+		t.Fatal("expected error for API failure")
 	}
 }
 
