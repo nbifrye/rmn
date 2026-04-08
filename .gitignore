@@ -18,6 +18,9 @@ CLAUDE.local.md
 # Build
 dist/
 
+# Nix
+result
+
 # Test coverage
 coverage.out
 coverage-func.txt

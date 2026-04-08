@@ -1,0 +1,63 @@
+version: 2
+
+project_name: rmn
+
+before:
+  hooks:
+    - go mod tidy
+    - go vet ./...
+
+builds:
+  - main: ./cmd/rmn/
+    binary: rmn
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - linux
+      - darwin
+      - windows
+    goarch:
+      - amd64
+      - arm64
+    ldflags:
+      - -s -w
+      - -X main.version={{ .Version }}
+      - -X main.commit={{ .Commit }}
+      - -X main.date={{ .Date }}
+
+archives:
+  - format: tar.gz
+    name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+    format_overrides:
+      - goos: windows
+        format: zip
+
+checksum:
+  name_template: checksums.txt
+
+changelog:
+  sort: asc
+  filters:
+    exclude:
+      - "^docs:"
+      - "^test:"
+      - "^ci:"
+
+brews:
+  - repository:
+      owner: nbifrye
+      name: rmn
+      branch: main
+    directory: HomebrewFormula
+    homepage: "https://github.com/nbifrye/rmn"
+    description: "CLI tool for interacting with Redmine"
+    license: "MIT"
+    install: |
+      bin.install "rmn"
+    test: |
+      assert_match version.to_s, shell_output("#{bin}/rmn --version")
+
+release:
+  github:
+    owner: nbifrye
+    name: rmn
