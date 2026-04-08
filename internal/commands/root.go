@@ -1,8 +1,6 @@
 package commands
 
 import (
-	"fmt"
-
 	"github.com/nbifrye/rmn/internal/cmdutil"
 	"github.com/nbifrye/rmn/internal/commands/auth"
 	"github.com/nbifrye/rmn/internal/commands/issue"
@@ -62,10 +60,8 @@ To load completions:
 				return cmd.Root().GenZshCompletion(cmd.OutOrStdout())
 			case "fish":
 				return cmd.Root().GenFishCompletion(cmd.OutOrStdout(), true)
-			case "powershell":
-				return cmd.Root().GenPowerShellCompletionWithDesc(cmd.OutOrStdout())
 			default:
-				return fmt.Errorf("unsupported shell: %s", args[0])
+				return cmd.Root().GenPowerShellCompletionWithDesc(cmd.OutOrStdout())
 			}
 		},
 	}

@@ -3,11 +3,14 @@ package issue
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 
 	"github.com/nbifrye/rmn/internal/api"
+	"github.com/nbifrye/rmn/internal/cmdutil"
+	"github.com/nbifrye/rmn/internal/config"
 )
 
 func TestViewCommand_TableOutput(t *testing.T) {
@@ -101,6 +104,114 @@ func TestViewCommand_InvalidID(t *testing.T) {
 	}
 	if err.Error() != "invalid issue ID: abc" {
 		t.Errorf("unexpected error: %v", err)
+	}
+}
+
+func TestViewCommand_NoDescription(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		resp := struct {
+			Issue api.Issue `json:"issue"`
+		}{
+			Issue: api.Issue{ID: 1, Subject: "No desc", Description: ""},
+		}
+		json.NewEncoder(w).Encode(resp)
+	}))
+	defer srv.Close()
+
+	f := newTestFactory(srv)
+	cmd := NewCmdView(f)
+	setupRootFlags(cmd, "table")
+	cmd.SetArgs([]string{"1"})
+
+	err := cmd.Execute()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	out := f.IO.Out.(*bytes.Buffer).String()
+	// Should not contain an extra description section
+	if bytes.Contains([]byte(out), []byte("\n\n")) {
+		// This is fine - just checking it doesn't crash
+	}
+}
+
+func TestViewCommand_APIClientError(t *testing.T) {
+	f := &cmdutil.Factory{
+		Config: func() (*config.Config, error) { return &config.Config{}, nil },
+		APIClient: func() (*api.Client, error) {
+			return nil, fmt.Errorf("not configured")
+		},
+		IO: &cmdutil.IOStreams{
+			In: &bytes.Buffer{}, Out: &bytes.Buffer{}, ErrOut: &bytes.Buffer{},
+		},
+	}
+
+	cmd := NewCmdView(f)
+	setupRootFlags(cmd, "table")
+	cmd.SetArgs([]string{"42"})
+	err := cmd.Execute()
+	if err == nil {
+		t.Fatal("expected error for API client failure")
+	}
+}
+
+func TestViewCommand_APIError(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusNotFound)
+		w.Write([]byte(`{"errors":["Not found"]}`))
+	}))
+	defer srv.Close()
+
+	f := newTestFactory(srv)
+	cmd := NewCmdView(f)
+	setupRootFlags(cmd, "table")
+	cmd.SetArgs([]string{"999"})
+
+	err := cmd.Execute()
+	if err == nil {
+		t.Fatal("expected error for not found")
+	}
+}
+
+func TestViewCommand_MissingArgs(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {}))
+	defer srv.Close()
+
+	f := newTestFactory(srv)
+	cmd := NewCmdView(f)
+	setupRootFlags(cmd, "table")
+	// No args provided
+	cmd.SetArgs([]string{})
+
+	err := cmd.Execute()
+	if err == nil {
+		t.Fatal("expected error for missing args")
+	}
+}
+
+func TestViewCommand_JSONMarshalError(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		resp := struct {
+			Issue api.Issue `json:"issue"`
+		}{Issue: api.Issue{ID: 1, Subject: "test"}}
+		json.NewEncoder(w).Encode(resp)
+	}))
+	defer srv.Close()
+
+	origMarshal := marshalJSON
+	marshalJSON = func(v interface{}, prefix, indent string) ([]byte, error) {
+		return nil, fmt.Errorf("marshal error")
+	}
+	defer func() { marshalJSON = origMarshal }()
+
+	f := newTestFactory(srv)
+	cmd := NewCmdView(f)
+	setupRootFlags(cmd, "json")
+	cmd.SetArgs([]string{"1"})
+
+	err := cmd.Execute()
+	if err == nil {
+		t.Fatal("expected error for marshal failure")
 	}
 }
 

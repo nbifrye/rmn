@@ -15,17 +15,22 @@ var (
 	version = "dev"
 	commit  = "none"
 	date    = "unknown"
+
+	osExit = os.Exit
 )
+
+func run(ctx context.Context, version string) error {
+	f := cmdutil.NewFactory()
+	cmd := commands.NewCmdRoot(f, version)
+	return cmd.ExecuteContext(ctx)
+}
 
 func main() {
 	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer cancel()
 
-	f := cmdutil.NewFactory()
-	cmd := commands.NewCmdRoot(f, version)
-
-	if err := cmd.ExecuteContext(ctx); err != nil {
+	if err := run(ctx, version); err != nil {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-		os.Exit(1)
+		osExit(1)
 	}
 }
