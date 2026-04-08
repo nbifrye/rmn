@@ -250,3 +250,35 @@ func TestLoad_InsecurePermissions(t *testing.T) {
 		t.Errorf("unexpected error: %v", err)
 	}
 }
+
+func TestLoad_StatErrorNotErrNotExist(t *testing.T) {
+	tmpDir := t.TempDir()
+	t.Setenv("XDG_CONFIG_HOME", tmpDir)
+
+	// Create "rmn" as a regular file instead of a directory.
+	// os.Stat("rmn/config.json") returns ENOTDIR, which is not ErrNotExist.
+	os.WriteFile(filepath.Join(tmpDir, "rmn"), []byte("not a dir"), 0o600)
+
+	_, err := Load()
+	if err == nil {
+		t.Fatal("expected error when stat fails with non-ErrNotExist")
+	}
+}
+
+func TestLoad_ReadFileError(t *testing.T) {
+	tmpDir := t.TempDir()
+	t.Setenv("XDG_CONFIG_HOME", tmpDir)
+
+	dir := filepath.Join(tmpDir, "rmn")
+	os.MkdirAll(dir, 0o700)
+
+	// Create config.json as a directory with 0600 permissions.
+	// os.Stat succeeds, permission check passes (0600 & 077 = 0),
+	// but os.ReadFile fails with "is a directory".
+	os.Mkdir(filepath.Join(dir, "config.json"), 0o600)
+
+	_, err := Load()
+	if err == nil {
+		t.Fatal("expected error when ReadFile fails on directory")
+	}
+}

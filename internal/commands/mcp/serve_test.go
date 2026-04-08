@@ -775,5 +775,81 @@ func TestListIssuesHandler_WithAllParams(t *testing.T) {
 	}
 }
 
+func TestListIssuesHandler_MarshalError(t *testing.T) {
+	s, srv := setupTestServer(t)
+	defer srv.Close()
+
+	origToJSON := toJSON
+	toJSON = func(v interface{}) (string, error) { return "", fmt.Errorf("marshal error") }
+	defer func() { toJSON = origToJSON }()
+
+	text, isErr := callTool(t, s, "list_issues", map[string]interface{}{})
+	if !isErr {
+		t.Errorf("expected error result, got: %s", text)
+	}
+}
+
+func TestGetIssueHandler_MarshalError(t *testing.T) {
+	s, srv := setupTestServer(t)
+	defer srv.Close()
+
+	origToJSON := toJSON
+	toJSON = func(v interface{}) (string, error) { return "", fmt.Errorf("marshal error") }
+	defer func() { toJSON = origToJSON }()
+
+	text, isErr := callTool(t, s, "get_issue", map[string]interface{}{"issue_id": 42})
+	if !isErr {
+		t.Errorf("expected error result, got: %s", text)
+	}
+}
+
+func TestCreateIssueHandler_MarshalError(t *testing.T) {
+	s, srv := setupTestServer(t)
+	defer srv.Close()
+
+	origToJSON := toJSON
+	toJSON = func(v interface{}) (string, error) { return "", fmt.Errorf("marshal error") }
+	defer func() { toJSON = origToJSON }()
+
+	text, isErr := callTool(t, s, "create_issue", map[string]interface{}{
+		"project_id": "test",
+		"subject":    "test",
+	})
+	if !isErr {
+		t.Errorf("expected error result, got: %s", text)
+	}
+}
+
+func TestUpdateIssueHandler_MarshalError(t *testing.T) {
+	s, srv := setupTestServer(t)
+	defer srv.Close()
+
+	origToJSON := toJSON
+	toJSON = func(v interface{}) (string, error) { return "", fmt.Errorf("marshal error") }
+	defer func() { toJSON = origToJSON }()
+
+	text, isErr := callTool(t, s, "update_issue", map[string]interface{}{
+		"issue_id": 42,
+		"notes":    "test",
+	})
+	if !isErr {
+		t.Errorf("expected error result, got: %s", text)
+	}
+}
+
+func TestDeleteIssueHandler_MarshalError(t *testing.T) {
+	s, srv := setupTestServer(t)
+	defer srv.Close()
+
+	origToJSON := toJSON
+	toJSON = func(v interface{}) (string, error) { return "", fmt.Errorf("marshal error") }
+	defer func() { toJSON = origToJSON }()
+
+	text, isErr := callTool(t, s, "delete_issue", map[string]interface{}{"issue_id": 42})
+	if !isErr {
+		t.Errorf("expected error result, got: %s", text)
+	}
+}
+
 // Ensure unused import doesn't fail build
 var _ = mcplib.MethodToolsCall

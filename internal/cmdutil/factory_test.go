@@ -186,3 +186,25 @@ func TestNewFactory_APIClient_UnsupportedScheme(t *testing.T) {
 		t.Errorf("unexpected error: %v", err)
 	}
 }
+
+func TestNewFactory_APIClient_InvalidURL(t *testing.T) {
+	tmpDir := t.TempDir()
+	t.Setenv("XDG_CONFIG_HOME", tmpDir)
+
+	dir := filepath.Join(tmpDir, "rmn")
+	os.MkdirAll(dir, 0o700)
+	data, _ := json.Marshal(map[string]string{
+		"redmine_url": "http://host/%zz",
+		"api_key":     "test-key",
+	})
+	os.WriteFile(filepath.Join(dir, "config.json"), data, 0o600)
+
+	f := NewFactory()
+	_, err := f.APIClient()
+	if err == nil {
+		t.Fatal("expected error for invalid URL")
+	}
+	if !strings.Contains(err.Error(), "invalid Redmine URL") {
+		t.Errorf("unexpected error: %v", err)
+	}
+}

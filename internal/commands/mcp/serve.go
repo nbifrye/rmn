@@ -138,7 +138,8 @@ func registerTools(s *server.MCPServer, client *api.Client) {
 	)
 }
 
-func toJSON(v interface{}) (string, error) {
+// toJSON marshals a value to indented JSON. It is a variable so tests can replace it.
+var toJSON = func(v interface{}) (string, error) {
 	data, err := json.MarshalIndent(v, "", "  ")
 	if err != nil {
 		return "", fmt.Errorf("marshaling JSON: %w", err)
