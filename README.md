@@ -4,11 +4,36 @@ A CLI tool for interacting with [Redmine](https://www.redmine.org/), inspired by
 
 ## Installation
 
+### Homebrew (macOS/Linux)
+
+```bash
+brew tap nbifrye/rmn https://github.com/nbifrye/rmn.git
+brew install nbifrye/rmn/rmn
+```
+
+### mise
+
+```bash
+mise use -g ubi:nbifrye/rmn
+```
+
+### Nix
+
+```bash
+nix profile install github:nbifrye/rmn
+```
+
+### Go
+
 ```bash
 go install github.com/nbifrye/rmn/cmd/rmn@latest
 ```
 
-Or build from source:
+### Binary download
+
+Download pre-built binaries from [GitHub Releases](https://github.com/nbifrye/rmn/releases).
+
+### Build from source
 
 ```bash
 make build
