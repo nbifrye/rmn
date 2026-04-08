@@ -34,7 +34,7 @@ func NewCmdRoot(f *cmdutil.Factory, version string) *cobra.Command {
 
 	cmd.AddCommand(auth.NewCmdAuth(f))
 	cmd.AddCommand(issue.NewCmdIssue(f))
-	cmd.AddCommand(mcp.NewCmdMcp(f))
+	cmd.AddCommand(mcp.NewCmdMcp(f, version))
 	cmd.AddCommand(newCmdCompletion())
 
 	return cmd

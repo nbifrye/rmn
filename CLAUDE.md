@@ -5,10 +5,16 @@
 ```bash
 go build -o rmn ./cmd/rmn/       # Build binary
 go test ./...                     # Run all tests
-go test ./internal/api/...        # Run API tests only
-go test -run TestListIssues ./... # Run single test
+go test -run TestFoo ./...        # Run single test
 go vet ./...                      # Static analysis
+make lint                         # Linter (golangci-lint required)
 ```
+
+## Verify Changes
+
+After any code change, always run:
+1. `go vet ./...` — must pass with zero warnings
+2. `go test ./...` — must pass with zero failures
 
 ## Architecture
 
@@ -22,7 +28,7 @@ internal/config/          XDG-compliant JSON config (~/.config/rmn/config.json)
 
 ## Code Style
 
-- Error wrapping: `fmt.Errorf("context: %w", err)` - always add context
+- Error wrapping: `fmt.Errorf("context: %w", err)` — always add context
 - Cobra commands: one file per subcommand, constructor returns `*cobra.Command`
 - Use `cmd.Context()` for context propagation
 - Use `f.IO.Out` / `f.IO.ErrOut` for output, never bare `fmt.Println`
@@ -36,3 +42,19 @@ internal/config/          XDG-compliant JSON config (~/.config/rmn/config.json)
 - MCP tool names use snake_case matching CLI subcommands
 - Config validation happens in Factory.APIClient(), not in individual commands
 - Global `--output` flag: "table" (default) or "json"
+
+## Adding a New Command
+
+1. Create `internal/commands/<group>/<name>.go` with `NewCmd<Name>(f *cmdutil.Factory) *cobra.Command`
+2. Register in the parent command group's `.go` file via `cmd.AddCommand()`
+3. Support `--output json` for machine-readable output
+4. Create `<name>_test.go` with httptest mock server
+5. Add corresponding MCP tool in `internal/commands/mcp/serve.go` with annotations
+
+## MCP Tool Guidelines
+
+- Every tool MUST have annotations (readOnlyHint, destructiveHint, idempotentHint, openWorldHint)
+- Read-only tools: `WithReadOnlyHintAnnotation(true)`, `WithDestructiveHintAnnotation(false)`
+- Destructive tools: `WithDestructiveHintAnnotation(true)`, `WithReadOnlyHintAnnotation(false)`
+- Tool descriptions must include: what it does, what it returns, and edge case behavior
+- Do NOT hardcode Redmine-instance-specific IDs in descriptions; note they are configurable
