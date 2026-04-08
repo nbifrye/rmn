@@ -17,3 +17,7 @@ CLAUDE.local.md
 
 # Build
 dist/
+
+# Test coverage
+coverage.out
+coverage-func.txt
