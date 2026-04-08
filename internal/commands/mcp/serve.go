@@ -13,18 +13,18 @@ import (
 	"github.com/spf13/cobra"
 )
 
-func NewCmdMcp(f *cmdutil.Factory) *cobra.Command {
+func NewCmdMcp(f *cmdutil.Factory, version string) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "mcp",
 		Short: "MCP server commands",
 		Long:  "Model Context Protocol server for exposing Redmine operations to AI agents.",
 	}
 
-	cmd.AddCommand(newCmdServe(f))
+	cmd.AddCommand(newCmdServe(f, version))
 	return cmd
 }
 
-func newCmdServe(f *cmdutil.Factory) *cobra.Command {
+func newCmdServe(f *cmdutil.Factory, version string) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "serve",
 		Short: "Start MCP server",
@@ -35,7 +35,7 @@ func newCmdServe(f *cmdutil.Factory) *cobra.Command {
 				return fmt.Errorf("failed to create API client: %w", err)
 			}
 
-			s := server.NewMCPServer("rmn-redmine", "0.1.0")
+			s := server.NewMCPServer("rmn-redmine", version)
 			registerTools(s, client)
 
 			return server.ServeStdio(s)
@@ -46,62 +46,87 @@ func newCmdServe(f *cmdutil.Factory) *cobra.Command {
 }
 
 func registerTools(s *server.MCPServer, client *api.Client) {
-	// list_issues
+	// list_issues — read-only, idempotent
 	s.AddTool(
 		mcp.NewTool("list_issues",
-			mcp.WithDescription("List Redmine issues with optional filters. Returns an array of issues with their ID, subject, project, tracker, status, priority, and assignee."),
+			mcp.WithDescription("List Redmine issues with optional filters. Returns a JSON object with an 'issues' array and 'total_count'. Without filters, returns open issues. Use 'offset' and 'limit' for pagination through large result sets."),
+			mcp.WithTitleAnnotation("List Redmine Issues"),
+			mcp.WithReadOnlyHintAnnotation(true),
+			mcp.WithDestructiveHintAnnotation(false),
+			mcp.WithIdempotentHintAnnotation(true),
+			mcp.WithOpenWorldHintAnnotation(true),
 			mcp.WithString("project_id", mcp.Description("Filter by project ID (numeric) or identifier (string, e.g. 'my-project')")),
 			mcp.WithString("status_id", mcp.Description("Filter by status: 'open' (default), 'closed', '*' (all), or a numeric status ID")),
 			mcp.WithString("assigned_to_id", mcp.Description("Filter by assignee: 'me' for current user, or a numeric user ID")),
-			mcp.WithNumber("tracker_id", mcp.Description("Filter by tracker ID (e.g. 1=Bug, 2=Feature)")),
+			mcp.WithNumber("tracker_id", mcp.Description("Filter by tracker ID (values are specific to your Redmine instance)")),
 			mcp.WithNumber("limit", mcp.Description("Max number of results to return (default 25, max 100)")),
 			mcp.WithNumber("offset", mcp.Description("Pagination offset for retrieving subsequent pages")),
 		),
 		makeListIssuesHandler(client),
 	)
 
-	// get_issue
+	// get_issue — read-only, idempotent
 	s.AddTool(
 		mcp.NewTool("get_issue",
 			mcp.WithDescription("Get full details of a specific Redmine issue by ID, including project, tracker, status, priority, author, assignee, description, and timestamps."),
+			mcp.WithTitleAnnotation("Get Redmine Issue"),
+			mcp.WithReadOnlyHintAnnotation(true),
+			mcp.WithDestructiveHintAnnotation(false),
+			mcp.WithIdempotentHintAnnotation(true),
+			mcp.WithOpenWorldHintAnnotation(true),
 			mcp.WithNumber("issue_id", mcp.Required(), mcp.Description("The numeric issue ID")),
 		),
 		makeGetIssueHandler(client),
 	)
 
-	// create_issue
+	// create_issue — not read-only, not idempotent (creates new resource each time)
 	s.AddTool(
 		mcp.NewTool("create_issue",
 			mcp.WithDescription("Create a new Redmine issue. Returns the created issue with its assigned ID."),
+			mcp.WithTitleAnnotation("Create Redmine Issue"),
+			mcp.WithReadOnlyHintAnnotation(false),
+			mcp.WithDestructiveHintAnnotation(false),
+			mcp.WithIdempotentHintAnnotation(false),
+			mcp.WithOpenWorldHintAnnotation(true),
 			mcp.WithString("project_id", mcp.Required(), mcp.Description("Project ID (numeric) or identifier (string, e.g. 'my-project')")),
 			mcp.WithString("subject", mcp.Required(), mcp.Description("Issue subject/title")),
 			mcp.WithString("description", mcp.Description("Detailed issue description (supports Textile markup)")),
-			mcp.WithNumber("tracker_id", mcp.Description("Tracker ID (e.g. 1=Bug, 2=Feature)")),
-			mcp.WithNumber("priority_id", mcp.Description("Priority ID (e.g. 1=Low, 2=Normal, 3=High, 4=Urgent)")),
+			mcp.WithNumber("tracker_id", mcp.Description("Tracker ID (values are specific to your Redmine instance)")),
+			mcp.WithNumber("priority_id", mcp.Description("Priority ID (values are specific to your Redmine instance)")),
 			mcp.WithNumber("assigned_to_id", mcp.Description("User ID to assign the issue to")),
 		),
 		makeCreateIssueHandler(client),
 	)
 
-	// update_issue
+	// update_issue — not read-only, idempotent (same update yields same result)
 	s.AddTool(
 		mcp.NewTool("update_issue",
 			mcp.WithDescription("Update an existing Redmine issue. Only provided fields are changed; omitted fields are left unchanged."),
+			mcp.WithTitleAnnotation("Update Redmine Issue"),
+			mcp.WithReadOnlyHintAnnotation(false),
+			mcp.WithDestructiveHintAnnotation(false),
+			mcp.WithIdempotentHintAnnotation(true),
+			mcp.WithOpenWorldHintAnnotation(true),
 			mcp.WithNumber("issue_id", mcp.Required(), mcp.Description("The numeric issue ID to update")),
 			mcp.WithString("subject", mcp.Description("New subject/title")),
 			mcp.WithString("description", mcp.Description("New description (supports Textile markup)")),
-			mcp.WithNumber("status_id", mcp.Description("New status ID (e.g. 1=New, 2=In Progress, 3=Resolved, 5=Closed)")),
-			mcp.WithNumber("priority_id", mcp.Description("New priority ID")),
+			mcp.WithNumber("status_id", mcp.Description("New status ID (values are specific to your Redmine instance)")),
+			mcp.WithNumber("priority_id", mcp.Description("New priority ID (values are specific to your Redmine instance)")),
 			mcp.WithNumber("assigned_to_id", mcp.Description("New assignee user ID (set to 0 to unassign)")),
 			mcp.WithString("notes", mcp.Description("Add a comment/note to the issue")),
 		),
 		makeUpdateIssueHandler(client),
 	)
 
-	// delete_issue
+	// delete_issue — destructive, idempotent
 	s.AddTool(
 		mcp.NewTool("delete_issue",
-			mcp.WithDescription("Permanently delete a Redmine issue. This action cannot be undone."),
+			mcp.WithDescription("Permanently delete a Redmine issue. This action cannot be undone. No confirmation is requested."),
+			mcp.WithTitleAnnotation("Delete Redmine Issue"),
+			mcp.WithReadOnlyHintAnnotation(false),
+			mcp.WithDestructiveHintAnnotation(true),
+			mcp.WithIdempotentHintAnnotation(true),
+			mcp.WithOpenWorldHintAnnotation(true),
 			mcp.WithNumber("issue_id", mcp.Required(), mcp.Description("The numeric issue ID to delete")),
 		),
 		makeDeleteIssueHandler(client),
@@ -171,13 +196,16 @@ func getIntPtrArg(args map[string]interface{}, key string) *int {
 	return nil
 }
 
-// getStringPtrArg returns nil if the key is absent, or a pointer to the string value.
+// getStringPtrArg returns nil if the key is absent or not a string, or a pointer to the string value.
 func getStringPtrArg(args map[string]interface{}, key string) *string {
 	v, ok := args[key]
 	if !ok || v == nil {
 		return nil
 	}
-	s, _ := v.(string)
+	s, ok := v.(string)
+	if !ok {
+		return nil
+	}
 	return &s
 }
 

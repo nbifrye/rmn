@@ -254,5 +254,129 @@ func TestDeleteIssueHandler_MissingID(t *testing.T) {
 	}
 }
 
+func TestGetStringPtrArg_NonStringType(t *testing.T) {
+	args := map[string]interface{}{
+		"str":     "hello",
+		"number":  42.0,
+		"nil_val": nil,
+		"bool":    true,
+	}
+
+	// String type should return pointer to the string
+	if v := getStringPtrArg(args, "str"); v == nil || *v != "hello" {
+		t.Errorf("expected pointer to 'hello', got %v", v)
+	}
+
+	// Non-string type (number) should return nil, not &""
+	if v := getStringPtrArg(args, "number"); v != nil {
+		t.Errorf("expected nil for number type, got %q", *v)
+	}
+
+	// Nil value should return nil
+	if v := getStringPtrArg(args, "nil_val"); v != nil {
+		t.Errorf("expected nil for nil value, got %q", *v)
+	}
+
+	// Absent key should return nil
+	if v := getStringPtrArg(args, "missing"); v != nil {
+		t.Errorf("expected nil for missing key, got %q", *v)
+	}
+
+	// Bool type should return nil
+	if v := getStringPtrArg(args, "bool"); v != nil {
+		t.Errorf("expected nil for bool type, got %q", *v)
+	}
+}
+
+func TestToolAnnotations(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer srv.Close()
+
+	client := api.NewClient(srv.URL, "test-key")
+	mcpServer := server.NewMCPServer("test", "0.1.0")
+	registerTools(mcpServer, client)
+
+	// Initialize the server
+	initMsg := `{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-03-26","capabilities":{},"clientInfo":{"name":"test","version":"1.0"}}}`
+	mcpServer.HandleMessage(context.Background(), json.RawMessage(initMsg))
+
+	// List tools to verify annotations
+	listMsg := `{"jsonrpc":"2.0","id":2,"method":"tools/list"}`
+	resp := mcpServer.HandleMessage(context.Background(), json.RawMessage(listMsg))
+
+	respData, err := json.Marshal(resp)
+	if err != nil {
+		t.Fatalf("marshal response: %v", err)
+	}
+
+	var rpcResp struct {
+		Result struct {
+			Tools []struct {
+				Name        string `json:"name"`
+				Annotations struct {
+					Title           string `json:"title"`
+					ReadOnlyHint    *bool  `json:"readOnlyHint"`
+					DestructiveHint *bool  `json:"destructiveHint"`
+					IdempotentHint  *bool  `json:"idempotentHint"`
+					OpenWorldHint   *bool  `json:"openWorldHint"`
+				} `json:"annotations"`
+			} `json:"tools"`
+		} `json:"result"`
+	}
+	if err := json.Unmarshal(respData, &rpcResp); err != nil {
+		t.Fatalf("unmarshal response: %v\n%s", err, string(respData))
+	}
+
+	tests := []struct {
+		name            string
+		wantReadOnly    bool
+		wantDestructive bool
+		wantIdempotent  bool
+	}{
+		{"list_issues", true, false, true},
+		{"get_issue", true, false, true},
+		{"create_issue", false, false, false},
+		{"update_issue", false, false, true},
+		{"delete_issue", false, true, true},
+	}
+
+	toolMap := make(map[string]struct {
+		ReadOnlyHint    *bool
+		DestructiveHint *bool
+		IdempotentHint  *bool
+	})
+	for _, tool := range rpcResp.Result.Tools {
+		toolMap[tool.Name] = struct {
+			ReadOnlyHint    *bool
+			DestructiveHint *bool
+			IdempotentHint  *bool
+		}{
+			ReadOnlyHint:    tool.Annotations.ReadOnlyHint,
+			DestructiveHint: tool.Annotations.DestructiveHint,
+			IdempotentHint:  tool.Annotations.IdempotentHint,
+		}
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			tool, ok := toolMap[tc.name]
+			if !ok {
+				t.Fatalf("tool %q not found in registered tools", tc.name)
+			}
+			if tool.ReadOnlyHint == nil || *tool.ReadOnlyHint != tc.wantReadOnly {
+				t.Errorf("readOnlyHint: got %v, want %v", tool.ReadOnlyHint, tc.wantReadOnly)
+			}
+			if tool.DestructiveHint == nil || *tool.DestructiveHint != tc.wantDestructive {
+				t.Errorf("destructiveHint: got %v, want %v", tool.DestructiveHint, tc.wantDestructive)
+			}
+			if tool.IdempotentHint == nil || *tool.IdempotentHint != tc.wantIdempotent {
+				t.Errorf("idempotentHint: got %v, want %v", tool.IdempotentHint, tc.wantIdempotent)
+			}
+		})
+	}
+}
+
 // Ensure unused import doesn't fail build
 var _ = mcplib.MethodToolsCall
