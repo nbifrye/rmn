@@ -8,13 +8,22 @@ import (
 	"github.com/spf13/cobra"
 )
 
-func NewCmdRoot(f *cmdutil.Factory) *cobra.Command {
+func NewCmdRoot(f *cmdutil.Factory, version string) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "rmn",
-		Short: "Redmine CLI",
-		Long:  "rmn is a CLI tool for interacting with Redmine.",
+		Use:     "rmn",
+		Short:   "Redmine CLI",
+		Long:    "rmn is a CLI tool for interacting with Redmine.",
+		Version: version,
 		SilenceErrors: true,
 		SilenceUsage:  true,
+		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
+			url, _ := cmd.Root().PersistentFlags().GetString("redmine-url")
+			key, _ := cmd.Root().PersistentFlags().GetString("api-key")
+			if url != "" || key != "" {
+				f.SetFlagOverrides(url, key)
+			}
+			return nil
+		},
 	}
 
 	cmd.PersistentFlags().String("output", "table", "Output format: table or json")

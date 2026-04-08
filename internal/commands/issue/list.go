@@ -1,7 +1,6 @@
 package issue
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
 	"text/tabwriter"
@@ -12,12 +11,13 @@ import (
 )
 
 func NewCmdList(f *cmdutil.Factory) *cobra.Command {
-	var projectID, trackerID, limit, offset int
-	var statusID, assignedToID string
+	var trackerID, limit, offset int
+	var projectID, statusID, assignedToID string
 
 	cmd := &cobra.Command{
-		Use:   "list",
-		Short: "List issues",
+		Use:     "list",
+		Aliases: []string{"ls"},
+		Short:   "List issues",
 		Long:  "List Redmine issues with optional filters.",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			client, err := f.APIClient()
@@ -34,17 +34,20 @@ func NewCmdList(f *cmdutil.Factory) *cobra.Command {
 				Offset:       offset,
 			}
 
-			issues, total, err := client.ListIssues(context.Background(), params)
+			issues, total, err := client.ListIssues(cmd.Context(), params)
 			if err != nil {
 				return err
 			}
 
 			output, _ := cmd.Root().PersistentFlags().GetString("output")
 			if output == "json" {
-				data, _ := json.MarshalIndent(struct {
+				data, err := json.MarshalIndent(struct {
 					Issues     []api.Issue `json:"issues"`
 					TotalCount int         `json:"total_count"`
 				}{Issues: issues, TotalCount: total}, "", "  ")
+				if err != nil {
+					return fmt.Errorf("marshaling JSON: %w", err)
+				}
 				fmt.Fprintln(f.IO.Out, string(data))
 				return nil
 			}
@@ -77,7 +80,7 @@ func NewCmdList(f *cmdutil.Factory) *cobra.Command {
 		},
 	}
 
-	cmd.Flags().IntVarP(&projectID, "project", "p", 0, "Filter by project ID")
+	cmd.Flags().StringVarP(&projectID, "project", "p", "", "Filter by project (ID or identifier)")
 	cmd.Flags().StringVarP(&statusID, "status", "s", "", "Filter by status (open, closed, * for all, or status ID)")
 	cmd.Flags().StringVarP(&assignedToID, "assignee", "a", "", "Filter by assignee (me or user ID)")
 	cmd.Flags().IntVarP(&trackerID, "tracker", "t", 0, "Filter by tracker ID")

@@ -1,6 +1,6 @@
 # Binary
-rmn
 /rmn
+*.exe
 
 # IDE
 .idea/

@@ -1,7 +1,6 @@
 package issue
 
 import (
-	"context"
 	"fmt"
 	"strconv"
 
@@ -40,7 +39,7 @@ func NewCmdUpdate(f *cmdutil.Factory) *cobra.Command {
 				Notes:        notes,
 			}
 
-			if err := client.UpdateIssue(context.Background(), id, params); err != nil {
+			if err := client.UpdateIssue(cmd.Context(), id, params); err != nil {
 				return err
 			}
 

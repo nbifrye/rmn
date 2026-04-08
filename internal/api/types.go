@@ -22,14 +22,15 @@ type Issue struct {
 }
 
 // IssueCreateParams holds parameters for creating an issue.
+// ProjectID accepts both numeric IDs and string identifiers (e.g. "my-project").
 type IssueCreateParams struct {
-	ProjectID   int    `json:"project_id"`
-	TrackerID   int    `json:"tracker_id,omitempty"`
-	StatusID    int    `json:"status_id,omitempty"`
-	PriorityID  int    `json:"priority_id,omitempty"`
-	Subject     string `json:"subject"`
-	Description string `json:"description,omitempty"`
-	AssignedToID int   `json:"assigned_to_id,omitempty"`
+	ProjectID    interface{} `json:"project_id"`
+	TrackerID    int         `json:"tracker_id,omitempty"`
+	StatusID     int         `json:"status_id,omitempty"`
+	PriorityID   int         `json:"priority_id,omitempty"`
+	Subject      string      `json:"subject"`
+	Description  string      `json:"description,omitempty"`
+	AssignedToID int         `json:"assigned_to_id,omitempty"`
 }
 
 // IssueUpdateParams holds parameters for updating an issue.
@@ -44,8 +45,9 @@ type IssueUpdateParams struct {
 }
 
 // IssueListParams holds parameters for listing issues.
+// ProjectID accepts both numeric IDs and string identifiers (e.g. "my-project").
 type IssueListParams struct {
-	ProjectID    int    `json:"project_id,omitempty"`
+	ProjectID    string `json:"project_id,omitempty"`
 	StatusID     string `json:"status_id,omitempty"`
 	AssignedToID string `json:"assigned_to_id,omitempty"`
 	TrackerID    int    `json:"tracker_id,omitempty"`

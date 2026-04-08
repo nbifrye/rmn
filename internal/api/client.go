@@ -60,6 +60,12 @@ func (c *Client) do(req *http.Request, result interface{}) error {
 	}
 
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		var redmineErr struct {
+			Errors []string `json:"errors"`
+		}
+		if json.Unmarshal(data, &redmineErr) == nil && len(redmineErr.Errors) > 0 {
+			return fmt.Errorf("API error (status %d): %s", resp.StatusCode, strings.Join(redmineErr.Errors, "; "))
+		}
 		return fmt.Errorf("API error (status %d): %s", resp.StatusCode, string(data))
 	}
 

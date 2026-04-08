@@ -1,7 +1,6 @@
 package issue
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
 	"strconv"
@@ -12,8 +11,9 @@ import (
 
 func NewCmdView(f *cmdutil.Factory) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "view <id>",
-		Short: "View an issue",
+		Use:     "view <id>",
+		Aliases: []string{"show", "get"},
+		Short:   "View an issue",
 		Long:  "Display details of a Redmine issue.",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -27,14 +27,17 @@ func NewCmdView(f *cmdutil.Factory) *cobra.Command {
 				return err
 			}
 
-			issue, err := client.GetIssue(context.Background(), id)
+			issue, err := client.GetIssue(cmd.Context(), id)
 			if err != nil {
 				return err
 			}
 
 			output, _ := cmd.Root().PersistentFlags().GetString("output")
 			if output == "json" {
-				data, _ := json.MarshalIndent(issue, "", "  ")
+				data, err := json.MarshalIndent(issue, "", "  ")
+				if err != nil {
+					return fmt.Errorf("marshaling JSON: %w", err)
+				}
 				fmt.Fprintln(f.IO.Out, string(data))
 				return nil
 			}
