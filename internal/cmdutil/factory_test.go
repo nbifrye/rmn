@@ -1,9 +1,11 @@
 package cmdutil
 
 import (
+	"bytes"
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -132,5 +134,77 @@ func TestNewFactory_APIClient_FlagOverrides(t *testing.T) {
 	}
 	if client.APIKey != "override-key" {
 		t.Errorf("expected override key, got: %s", client.APIKey)
+	}
+}
+
+func TestNewFactory_APIClient_HTTPWarning(t *testing.T) {
+	tmpDir := t.TempDir()
+	t.Setenv("XDG_CONFIG_HOME", tmpDir)
+
+	dir := filepath.Join(tmpDir, "rmn")
+	os.MkdirAll(dir, 0o700)
+	data, _ := json.Marshal(map[string]string{
+		"redmine_url": "http://redmine.example.com",
+		"api_key":     "test-key",
+	})
+	os.WriteFile(filepath.Join(dir, "config.json"), data, 0o600)
+
+	errBuf := &bytes.Buffer{}
+	f := NewFactory()
+	f.IO.ErrOut = errBuf
+
+	client, err := f.APIClient()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if client == nil {
+		t.Fatal("expected non-nil client")
+	}
+	if !strings.Contains(errBuf.String(), "Warning: using insecure HTTP connection") {
+		t.Errorf("expected HTTP warning, got: %q", errBuf.String())
+	}
+}
+
+func TestNewFactory_APIClient_UnsupportedScheme(t *testing.T) {
+	tmpDir := t.TempDir()
+	t.Setenv("XDG_CONFIG_HOME", tmpDir)
+
+	dir := filepath.Join(tmpDir, "rmn")
+	os.MkdirAll(dir, 0o700)
+	data, _ := json.Marshal(map[string]string{
+		"redmine_url": "ftp://redmine.example.com",
+		"api_key":     "test-key",
+	})
+	os.WriteFile(filepath.Join(dir, "config.json"), data, 0o600)
+
+	f := NewFactory()
+	_, err := f.APIClient()
+	if err == nil {
+		t.Fatal("expected error for unsupported scheme")
+	}
+	if !strings.Contains(err.Error(), "unsupported URL scheme") {
+		t.Errorf("unexpected error: %v", err)
+	}
+}
+
+func TestNewFactory_APIClient_InvalidURL(t *testing.T) {
+	tmpDir := t.TempDir()
+	t.Setenv("XDG_CONFIG_HOME", tmpDir)
+
+	dir := filepath.Join(tmpDir, "rmn")
+	os.MkdirAll(dir, 0o700)
+	data, _ := json.Marshal(map[string]string{
+		"redmine_url": "http://host/%zz",
+		"api_key":     "test-key",
+	})
+	os.WriteFile(filepath.Join(dir, "config.json"), data, 0o600)
+
+	f := NewFactory()
+	_, err := f.APIClient()
+	if err == nil {
+		t.Fatal("expected error for invalid URL")
+	}
+	if !strings.Contains(err.Error(), "invalid Redmine URL") {
+		t.Errorf("unexpected error: %v", err)
 	}
 }

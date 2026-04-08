@@ -3,6 +3,7 @@ package config
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 )
@@ -38,11 +39,20 @@ func Load() (*Config, error) {
 		return nil, err
 	}
 
-	data, err := os.ReadFile(path)
+	info, err := os.Stat(path)
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
 			return &Config{}, nil
 		}
+		return nil, err
+	}
+
+	if perm := info.Mode().Perm(); perm&0o077 != 0 {
+		return nil, fmt.Errorf("config file %s has insecure permissions %04o: expected 0600, run 'chmod 600 %s'", path, perm, path)
+	}
+
+	data, err := os.ReadFile(path)
+	if err != nil {
 		return nil, err
 	}
 
@@ -59,7 +69,7 @@ func (c *Config) Save() error {
 		return err
 	}
 
-	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
 		return err
 	}
 

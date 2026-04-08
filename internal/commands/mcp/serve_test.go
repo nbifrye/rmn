@@ -155,7 +155,7 @@ func TestGetIssueHandler_MissingID(t *testing.T) {
 	if !isErr {
 		t.Error("expected error result")
 	}
-	if text != "issue_id is required" {
+	if text != "issue_id must be a positive integer" {
 		t.Errorf("unexpected error: %s", text)
 	}
 }
@@ -255,6 +255,45 @@ func TestDeleteIssueHandler_MissingID(t *testing.T) {
 	_, isErr := callTool(t, s, "delete_issue", map[string]interface{}{})
 	if !isErr {
 		t.Error("expected error result")
+	}
+}
+
+func TestGetIssueHandler_NegativeID(t *testing.T) {
+	s, srv := setupTestServer(t)
+	defer srv.Close()
+
+	text, isErr := callTool(t, s, "get_issue", map[string]interface{}{"issue_id": -1})
+	if !isErr {
+		t.Error("expected error result for negative issue_id")
+	}
+	if text != "issue_id must be a positive integer" {
+		t.Errorf("unexpected error: %s", text)
+	}
+}
+
+func TestUpdateIssueHandler_NegativeID(t *testing.T) {
+	s, srv := setupTestServer(t)
+	defer srv.Close()
+
+	text, isErr := callTool(t, s, "update_issue", map[string]interface{}{"issue_id": -5})
+	if !isErr {
+		t.Error("expected error result for negative issue_id")
+	}
+	if text != "issue_id must be a positive integer" {
+		t.Errorf("unexpected error: %s", text)
+	}
+}
+
+func TestDeleteIssueHandler_NegativeID(t *testing.T) {
+	s, srv := setupTestServer(t)
+	defer srv.Close()
+
+	text, isErr := callTool(t, s, "delete_issue", map[string]interface{}{"issue_id": -3})
+	if !isErr {
+		t.Error("expected error result for negative issue_id")
+	}
+	if text != "issue_id must be a positive integer" {
+		t.Errorf("unexpected error: %s", text)
 	}
 }
 
@@ -654,7 +693,7 @@ func TestUpdateIssueHandler_MissingID(t *testing.T) {
 	if !isErr {
 		t.Errorf("expected error result, got: %s", text)
 	}
-	if text != "issue_id is required" {
+	if text != "issue_id must be a positive integer" {
 		t.Errorf("unexpected error: %s", text)
 	}
 }
@@ -733,6 +772,82 @@ func TestListIssuesHandler_WithAllParams(t *testing.T) {
 	})
 	if isErr {
 		t.Fatalf("unexpected error: %s", text)
+	}
+}
+
+func TestListIssuesHandler_MarshalError(t *testing.T) {
+	s, srv := setupTestServer(t)
+	defer srv.Close()
+
+	origToJSON := toJSON
+	toJSON = func(v interface{}) (string, error) { return "", fmt.Errorf("marshal error") }
+	defer func() { toJSON = origToJSON }()
+
+	text, isErr := callTool(t, s, "list_issues", map[string]interface{}{})
+	if !isErr {
+		t.Errorf("expected error result, got: %s", text)
+	}
+}
+
+func TestGetIssueHandler_MarshalError(t *testing.T) {
+	s, srv := setupTestServer(t)
+	defer srv.Close()
+
+	origToJSON := toJSON
+	toJSON = func(v interface{}) (string, error) { return "", fmt.Errorf("marshal error") }
+	defer func() { toJSON = origToJSON }()
+
+	text, isErr := callTool(t, s, "get_issue", map[string]interface{}{"issue_id": 42})
+	if !isErr {
+		t.Errorf("expected error result, got: %s", text)
+	}
+}
+
+func TestCreateIssueHandler_MarshalError(t *testing.T) {
+	s, srv := setupTestServer(t)
+	defer srv.Close()
+
+	origToJSON := toJSON
+	toJSON = func(v interface{}) (string, error) { return "", fmt.Errorf("marshal error") }
+	defer func() { toJSON = origToJSON }()
+
+	text, isErr := callTool(t, s, "create_issue", map[string]interface{}{
+		"project_id": "test",
+		"subject":    "test",
+	})
+	if !isErr {
+		t.Errorf("expected error result, got: %s", text)
+	}
+}
+
+func TestUpdateIssueHandler_MarshalError(t *testing.T) {
+	s, srv := setupTestServer(t)
+	defer srv.Close()
+
+	origToJSON := toJSON
+	toJSON = func(v interface{}) (string, error) { return "", fmt.Errorf("marshal error") }
+	defer func() { toJSON = origToJSON }()
+
+	text, isErr := callTool(t, s, "update_issue", map[string]interface{}{
+		"issue_id": 42,
+		"notes":    "test",
+	})
+	if !isErr {
+		t.Errorf("expected error result, got: %s", text)
+	}
+}
+
+func TestDeleteIssueHandler_MarshalError(t *testing.T) {
+	s, srv := setupTestServer(t)
+	defer srv.Close()
+
+	origToJSON := toJSON
+	toJSON = func(v interface{}) (string, error) { return "", fmt.Errorf("marshal error") }
+	defer func() { toJSON = origToJSON }()
+
+	text, isErr := callTool(t, s, "delete_issue", map[string]interface{}{"issue_id": 42})
+	if !isErr {
+		t.Errorf("expected error result, got: %s", text)
 	}
 }
 
