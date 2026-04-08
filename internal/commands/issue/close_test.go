@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/nbifrye/rmn/internal/api"
@@ -93,6 +94,9 @@ func TestCloseCommand_APIClientError(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected error for API client failure")
 	}
+	if !strings.Contains(err.Error(), "not configured") {
+		t.Errorf("expected 'not configured' in error, got: %v", err)
+	}
 }
 
 func TestCloseCommand_APIError(t *testing.T) {
@@ -111,13 +115,13 @@ func TestCloseCommand_APIError(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected error for API failure")
 	}
+	if !strings.Contains(err.Error(), "Not found") {
+		t.Errorf("expected 'Not found' in error, got: %v", err)
+	}
 }
 
 func TestCloseCommand_InvalidID(t *testing.T) {
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {}))
-	defer srv.Close()
-
-	f := newTestFactory(srv)
+	f := newNoServerFactory(t)
 	cmd := NewCmdClose(f)
 	setupRootFlags(cmd, "table")
 	cmd.SetArgs([]string{"xyz"})

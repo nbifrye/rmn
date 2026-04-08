@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/nbifrye/rmn/internal/api"
@@ -117,7 +118,16 @@ func TestCreateCommand_AllFlags(t *testing.T) {
 		json.NewDecoder(r.Body).Decode(&body)
 		issue := body["issue"].(map[string]interface{})
 		if issue["description"] != "A description" {
-			t.Errorf("expected description, got %v", issue["description"])
+			t.Errorf("expected description 'A description', got %v", issue["description"])
+		}
+		if issue["tracker_id"] != float64(1) {
+			t.Errorf("expected tracker_id 1, got %v", issue["tracker_id"])
+		}
+		if issue["priority_id"] != float64(2) {
+			t.Errorf("expected priority_id 2, got %v", issue["priority_id"])
+		}
+		if issue["assigned_to_id"] != float64(3) {
+			t.Errorf("expected assigned_to_id 3, got %v", issue["assigned_to_id"])
 		}
 		w.WriteHeader(http.StatusCreated)
 		resp := struct {
@@ -163,6 +173,9 @@ func TestCreateCommand_APIClientError(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected error for API client failure")
 	}
+	if !strings.Contains(err.Error(), "not configured") {
+		t.Errorf("expected 'not configured' in error, got: %v", err)
+	}
 }
 
 func TestCreateCommand_APIError(t *testing.T) {
@@ -181,40 +194,13 @@ func TestCreateCommand_APIError(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected error for API failure")
 	}
-}
-
-func TestCreateCommand_JSONMarshalError(t *testing.T) {
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusCreated)
-		resp := struct {
-			Issue api.Issue `json:"issue"`
-		}{Issue: api.Issue{ID: 1, Subject: "test"}}
-		json.NewEncoder(w).Encode(resp)
-	}))
-	defer srv.Close()
-
-	origMarshal := marshalJSON
-	marshalJSON = func(v interface{}, prefix, indent string) ([]byte, error) {
-		return nil, fmt.Errorf("marshal error")
-	}
-	defer func() { marshalJSON = origMarshal }()
-
-	f := newTestFactory(srv)
-	cmd := NewCmdCreate(f)
-	setupRootFlags(cmd, "json")
-	cmd.SetArgs([]string{"--project", "test", "--subject", "test"})
-
-	err := cmd.Execute()
-	if err == nil {
-		t.Fatal("expected error for marshal failure")
+	if !strings.Contains(err.Error(), "Validation failed") {
+		t.Errorf("expected 'Validation failed' in error, got: %v", err)
 	}
 }
 
 func TestCreateCommand_MissingProject(t *testing.T) {
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {}))
-	defer srv.Close()
-
-	f := newTestFactory(srv)
+	f := newNoServerFactory(t)
 	cmd := NewCmdCreate(f)
 	setupRootFlags(cmd, "table")
 	cmd.SetArgs([]string{"--subject", "No project"})
@@ -226,10 +212,7 @@ func TestCreateCommand_MissingProject(t *testing.T) {
 }
 
 func TestCreateCommand_MissingSubject(t *testing.T) {
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {}))
-	defer srv.Close()
-
-	f := newTestFactory(srv)
+	f := newNoServerFactory(t)
 	cmd := NewCmdCreate(f)
 	setupRootFlags(cmd, "table")
 	cmd.SetArgs([]string{"--project", "test"})

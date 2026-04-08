@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/nbifrye/rmn/internal/api"
@@ -139,6 +140,9 @@ func TestListCommand_APIClientError(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected error for API client failure")
 	}
+	if !strings.Contains(err.Error(), "not configured") {
+		t.Errorf("expected 'not configured' in error, got: %v", err)
+	}
 }
 
 func TestListCommand_APIError(t *testing.T) {
@@ -156,6 +160,9 @@ func TestListCommand_APIError(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected error for API failure")
 	}
+	if !strings.Contains(err.Error(), "Server error") {
+		t.Errorf("expected 'Server error' in error, got: %v", err)
+	}
 }
 
 func TestListCommand_WithFilters(t *testing.T) {
@@ -168,6 +175,15 @@ func TestListCommand_WithFilters(t *testing.T) {
 		}
 		if r.URL.Query().Get("assigned_to_id") != "me" {
 			t.Errorf("expected assigned_to_id=me, got %s", r.URL.Query().Get("assigned_to_id"))
+		}
+		if r.URL.Query().Get("tracker_id") != "1" {
+			t.Errorf("expected tracker_id=1, got %s", r.URL.Query().Get("tracker_id"))
+		}
+		if r.URL.Query().Get("limit") != "10" {
+			t.Errorf("expected limit=10, got %s", r.URL.Query().Get("limit"))
+		}
+		if r.URL.Query().Get("offset") != "5" {
+			t.Errorf("expected offset=5, got %s", r.URL.Query().Get("offset"))
 		}
 		resp := struct {
 			Issues     []api.Issue `json:"issues"`
@@ -185,32 +201,6 @@ func TestListCommand_WithFilters(t *testing.T) {
 	err := cmd.Execute()
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
-	}
-}
-
-func TestListCommand_JSONMarshalError(t *testing.T) {
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		resp := struct {
-			Issues     []api.Issue `json:"issues"`
-			TotalCount int         `json:"total_count"`
-		}{Issues: []api.Issue{{ID: 1}}, TotalCount: 1}
-		json.NewEncoder(w).Encode(resp)
-	}))
-	defer srv.Close()
-
-	origMarshal := marshalJSON
-	marshalJSON = func(v interface{}, prefix, indent string) ([]byte, error) {
-		return nil, fmt.Errorf("marshal error")
-	}
-	defer func() { marshalJSON = origMarshal }()
-
-	f := newTestFactory(srv)
-	cmd := NewCmdList(f)
-	setupRootFlags(cmd, "json")
-
-	err := cmd.Execute()
-	if err == nil {
-		t.Fatal("expected error for marshal failure")
 	}
 }
 

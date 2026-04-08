@@ -53,9 +53,6 @@ func Load() (*Config, error) {
 	return &cfg, nil
 }
 
-// jsonMarshalIndent is used by Save. It can be replaced in tests.
-var jsonMarshalIndent = json.MarshalIndent
-
 func (c *Config) Save() error {
 	path, err := configPath()
 	if err != nil {
@@ -66,10 +63,6 @@ func (c *Config) Save() error {
 		return err
 	}
 
-	data, err := jsonMarshalIndent(c, "", "  ")
-	if err != nil {
-		return err
-	}
-
+	data, _ := json.MarshalIndent(c, "", "  ")
 	return os.WriteFile(path, data, 0o600)
 }

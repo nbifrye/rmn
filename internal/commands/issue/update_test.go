@@ -74,10 +74,7 @@ func TestUpdateCommand_NoFlags(t *testing.T) {
 }
 
 func TestUpdateCommand_InvalidID(t *testing.T) {
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {}))
-	defer srv.Close()
-
-	f := newTestFactory(srv)
+	f := newNoServerFactory(t)
 	cmd := NewCmdUpdate(f)
 	setupRootFlags(cmd, "table")
 	cmd.SetArgs([]string{"abc", "--status", "1"})
@@ -95,10 +92,25 @@ func TestUpdateCommand_AllFlags(t *testing.T) {
 		}
 		json.NewDecoder(r.Body).Decode(&body)
 		if body.Issue["subject"] != "New subject" {
-			t.Errorf("expected subject, got %v", body.Issue["subject"])
+			t.Errorf("expected subject 'New subject', got %v", body.Issue["subject"])
 		}
 		if body.Issue["notes"] != "A note" {
-			t.Errorf("expected notes, got %v", body.Issue["notes"])
+			t.Errorf("expected notes 'A note', got %v", body.Issue["notes"])
+		}
+		if body.Issue["status_id"] != float64(3) {
+			t.Errorf("expected status_id 3, got %v", body.Issue["status_id"])
+		}
+		if body.Issue["tracker_id"] != float64(2) {
+			t.Errorf("expected tracker_id 2, got %v", body.Issue["tracker_id"])
+		}
+		if body.Issue["priority_id"] != float64(1) {
+			t.Errorf("expected priority_id 1, got %v", body.Issue["priority_id"])
+		}
+		if body.Issue["description"] != "New description" {
+			t.Errorf("expected description 'New description', got %v", body.Issue["description"])
+		}
+		if body.Issue["assigned_to_id"] != float64(5) {
+			t.Errorf("expected assigned_to_id 5, got %v", body.Issue["assigned_to_id"])
 		}
 		w.WriteHeader(http.StatusNoContent)
 	}))

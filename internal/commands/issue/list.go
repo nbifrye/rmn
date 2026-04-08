@@ -1,6 +1,7 @@
 package issue
 
 import (
+	"encoding/json"
 	"fmt"
 	"text/tabwriter"
 
@@ -40,13 +41,10 @@ func NewCmdList(f *cmdutil.Factory) *cobra.Command {
 
 			output, _ := cmd.Root().PersistentFlags().GetString("output")
 			if output == "json" {
-				data, err := marshalJSON(struct {
+				data, _ := json.MarshalIndent(struct {
 					Issues     []api.Issue `json:"issues"`
 					TotalCount int         `json:"total_count"`
 				}{Issues: issues, TotalCount: total}, "", "  ")
-				if err != nil {
-					return fmt.Errorf("marshaling JSON: %w", err)
-				}
 				fmt.Fprintln(f.IO.Out, string(data))
 				return nil
 			}
