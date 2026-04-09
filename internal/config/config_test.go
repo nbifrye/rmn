@@ -2,6 +2,7 @@ package config
 
 import (
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -262,6 +263,38 @@ func TestLoad_StatErrorNotErrNotExist(t *testing.T) {
 	_, err := Load()
 	if err == nil {
 		t.Fatal("expected error when stat fails with non-ErrNotExist")
+	}
+}
+
+func TestSave_MarshalError(t *testing.T) {
+	tmpDir := t.TempDir()
+	t.Setenv("XDG_CONFIG_HOME", tmpDir)
+
+	original := marshalConfig
+	defer func() { marshalConfig = original }()
+
+	marshalConfig = func(c *Config) ([]byte, error) {
+		return nil, fmt.Errorf("marshal error")
+	}
+
+	cfg := &Config{RedmineURL: "https://example.com", APIKey: "key"}
+	err := cfg.Save()
+	if err == nil {
+		t.Fatal("expected error from marshalConfig")
+	}
+	if !strings.Contains(err.Error(), "marshal error") {
+		t.Errorf("unexpected error: %v", err)
+	}
+}
+
+func TestMarshalConfig_Default(t *testing.T) {
+	cfg := &Config{RedmineURL: "https://example.com", APIKey: "key"}
+	data, err := marshalConfig(cfg)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !strings.Contains(string(data), "https://example.com") {
+		t.Errorf("unexpected JSON: %s", string(data))
 	}
 }
 

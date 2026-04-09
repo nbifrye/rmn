@@ -2,6 +2,7 @@ package issue
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -88,6 +89,39 @@ func TestDeleteCommand_Cancelled(t *testing.T) {
 	out := f.IO.Out.(*bytes.Buffer).String()
 	if !bytes.Contains([]byte(out), []byte("Cancelled")) {
 		t.Errorf("expected cancel message, got: %s", out)
+	}
+}
+
+func TestDeleteCommand_JSONOutput(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer srv.Close()
+
+	f := newTestFactory(srv)
+	cmd := NewCmdDelete(f)
+	setupRootFlags(cmd, "json")
+	cmd.SetArgs([]string{"42", "--yes"})
+
+	err := cmd.Execute()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	out := f.IO.Out.(*bytes.Buffer).String()
+	var result struct {
+		Status  string `json:"status"`
+		ID      int    `json:"id"`
+		Message string `json:"message"`
+	}
+	if err := json.Unmarshal([]byte(out), &result); err != nil {
+		t.Fatalf("expected valid JSON, got: %s", out)
+	}
+	if result.Status != "ok" {
+		t.Errorf("expected status 'ok', got %q", result.Status)
+	}
+	if result.ID != 42 {
+		t.Errorf("expected id 42, got %d", result.ID)
 	}
 }
 

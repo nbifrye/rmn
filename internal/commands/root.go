@@ -17,6 +17,7 @@ func NewCmdRoot(f *cmdutil.Factory, version string) *cobra.Command {
 		SilenceErrors: true,
 		SilenceUsage:  true,
 		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
+			// GetString cannot error for flags defined on this command.
 			url, _ := cmd.Root().PersistentFlags().GetString("redmine-url")
 			key, _ := cmd.Root().PersistentFlags().GetString("api-key")
 			if url != "" || key != "" {

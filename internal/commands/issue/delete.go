@@ -47,6 +47,21 @@ func NewCmdDelete(f *cmdutil.Factory) *cobra.Command {
 				return err
 			}
 
+			// GetString cannot error for flags defined on the root command.
+			output, _ := cmd.Root().PersistentFlags().GetString("output")
+			if output == "json" {
+				data, err := marshalJSON(struct {
+					Status  string `json:"status"`
+					ID      int    `json:"id"`
+					Message string `json:"message"`
+				}{Status: "ok", ID: id, Message: fmt.Sprintf("Deleted issue #%d", id)})
+				if err != nil {
+					return err
+				}
+				fmt.Fprintln(f.IO.Out, string(data))
+				return nil
+			}
+
 			fmt.Fprintf(f.IO.Out, "Deleted issue #%d\n", id)
 			return nil
 		},

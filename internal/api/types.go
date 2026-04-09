@@ -39,7 +39,7 @@ type IssueUpdateParams struct {
 	TrackerID    *int    `json:"tracker_id,omitempty"`
 	StatusID     *int    `json:"status_id,omitempty"`
 	PriorityID   *int    `json:"priority_id,omitempty"`
-	Subject      string  `json:"subject,omitempty"`
+	Subject      *string `json:"subject,omitempty"`
 	Description  *string `json:"description,omitempty"`
 	AssignedToID *int    `json:"assigned_to_id,omitempty"`
 	Notes        string  `json:"notes,omitempty"`

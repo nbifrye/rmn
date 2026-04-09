@@ -173,6 +173,39 @@ func TestUpdateCommand_APIError(t *testing.T) {
 	}
 }
 
+func TestUpdateCommand_JSONOutput(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusNoContent)
+	}))
+	defer srv.Close()
+
+	f := newTestFactory(srv)
+	cmd := NewCmdUpdate(f)
+	setupRootFlags(cmd, "json")
+	cmd.SetArgs([]string{"42", "--status", "3"})
+
+	err := cmd.Execute()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	out := f.IO.Out.(*bytes.Buffer).String()
+	var result struct {
+		Status  string `json:"status"`
+		ID      int    `json:"id"`
+		Message string `json:"message"`
+	}
+	if err := json.Unmarshal([]byte(out), &result); err != nil {
+		t.Fatalf("expected valid JSON, got: %s", out)
+	}
+	if result.Status != "ok" {
+		t.Errorf("expected status 'ok', got %q", result.Status)
+	}
+	if result.ID != 42 {
+		t.Errorf("expected id 42, got %d", result.ID)
+	}
+}
+
 func TestUpdateCommand_SubjectOnly(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		var body struct {

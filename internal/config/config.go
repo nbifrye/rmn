@@ -13,6 +13,15 @@ type Config struct {
 	APIKey     string `json:"api_key"`
 }
 
+// marshalConfig marshals the config to JSON. It is a variable so tests can replace it.
+var marshalConfig = func(c *Config) ([]byte, error) {
+	data, err := json.MarshalIndent(c, "", "  ")
+	if err != nil {
+		return nil, fmt.Errorf("marshaling config: %w", err)
+	}
+	return data, nil
+}
+
 func configDir() (string, error) {
 	dir := os.Getenv("XDG_CONFIG_HOME")
 	if dir == "" {
@@ -73,6 +82,9 @@ func (c *Config) Save() error {
 		return err
 	}
 
-	data, _ := json.MarshalIndent(c, "", "  ")
+	data, err := marshalConfig(c)
+	if err != nil {
+		return err
+	}
 	return os.WriteFile(path, data, 0o600)
 }
