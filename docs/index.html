@@ -1,0 +1,492 @@
+<!DOCTYPE html>
+<!-- Content sourced from README.md — keep in sync when README changes. -->
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+    <!-- Primary SEO Meta Tags -->
+    <title>rmn — Redmine CLI Tool | Command-Line Client for Redmine</title>
+    <meta name="description" content="rmn is a fast, open-source command-line client for Redmine written in Go. Manage issues, run an MCP server for AI agents, and automate Redmine workflows from your terminal.">
+    <meta name="keywords" content="redmine, cli, command-line, go, golang, issue tracker, mcp, model context protocol, ai agent, redmine api, redmine client, project management">
+    <meta name="author" content="nbifrye">
+    <link rel="canonical" href="https://nbifrye.github.io/rmn/">
+
+    <!-- Open Graph / Facebook -->
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://nbifrye.github.io/rmn/">
+    <meta property="og:title" content="rmn — Redmine CLI Tool">
+    <meta property="og:description" content="Fast, open-source command-line client for Redmine written in Go. Includes MCP server for AI agent integration.">
+    <meta property="og:site_name" content="rmn">
+
+    <!-- Twitter Card -->
+    <meta name="twitter:card" content="summary">
+    <meta name="twitter:title" content="rmn — Redmine CLI Tool">
+    <meta name="twitter:description" content="Fast, open-source command-line client for Redmine written in Go. Includes MCP server for AI agent integration.">
+
+    <!-- AI Agent Discovery -->
+    <link rel="alternate" type="text/plain" href="https://nbifrye.github.io/rmn/llms.txt" title="LLM-friendly documentation">
+
+    <!-- JSON-LD Structured Data -->
+    <script type="application/ld+json">
+    {
+        "@context": "https://schema.org",
+        "@type": "SoftwareApplication",
+        "name": "rmn",
+        "description": "Command-line client for Redmine written in Go with MCP server support for AI agents",
+        "url": "https://nbifrye.github.io/rmn/",
+        "applicationCategory": "DeveloperApplication",
+        "operatingSystem": "Linux, macOS, Windows",
+        "programmingLanguage": "Go",
+        "license": "https://opensource.org/licenses/MIT",
+        "codeRepository": "https://github.com/nbifrye/rmn",
+        "offers": {
+            "@type": "Offer",
+            "price": "0",
+            "priceCurrency": "USD"
+        }
+    }
+    </script>
+
+    <!-- Inline SVG Favicon (terminal icon) -->
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⚡</text></svg>">
+
+    <style>
+        *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+        :root{
+            --bg:#0d1117;--bg-alt:#161b22;--fg:#e6edf3;--fg-muted:#7d8590;
+            --accent:#58a6ff;--accent-hover:#79c0ff;--border:#30363d;
+            --code-bg:#1c2128;--code-fg:#e6edf3;
+            --max-w:52rem;--radius:6px;
+        }
+        @media(prefers-color-scheme:light){
+            :root{
+                --bg:#ffffff;--bg-alt:#f6f8fa;--fg:#1f2328;--fg-muted:#656d76;
+                --accent:#0969da;--accent-hover:#0550ae;--border:#d0d7de;
+                --code-bg:#f6f8fa;--code-fg:#1f2328;
+            }
+        }
+        html{scroll-behavior:smooth;font-size:16px}
+        body{
+            font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif;
+            background:var(--bg);color:var(--fg);line-height:1.6;
+        }
+        a{color:var(--accent);text-decoration:none}
+        a:hover{color:var(--accent-hover);text-decoration:underline}
+
+        /* Layout */
+        .container{max-width:var(--max-w);margin:0 auto;padding:0 1.5rem}
+
+        /* Header */
+        .site-header{border-bottom:1px solid var(--border);padding:1.5rem 0}
+        .site-header .container{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:.75rem}
+        .site-title{font-size:1.5rem;font-weight:700;color:var(--fg)}
+        .header-links{display:flex;gap:1rem;align-items:center;font-size:.875rem}
+        .badge{display:inline-block;padding:.15rem .5rem;border:1px solid var(--border);border-radius:var(--radius);font-size:.75rem;color:var(--fg-muted)}
+
+        /* Hero */
+        .hero{padding:3rem 0 2rem;text-align:center}
+        .hero h1{font-size:2.5rem;font-weight:800;margin-bottom:.75rem}
+        .hero .tagline{font-size:1.125rem;color:var(--fg-muted);max-width:40rem;margin:0 auto 1.5rem}
+        .hero .badges{display:flex;gap:.5rem;justify-content:center;flex-wrap:wrap;margin-bottom:1.5rem}
+        .hero .cta{display:inline-block;padding:.6rem 1.5rem;background:var(--accent);color:#fff;border-radius:var(--radius);font-weight:600;font-size:.95rem}
+        .hero .cta:hover{background:var(--accent-hover);text-decoration:none}
+
+        /* Table of Contents */
+        .toc{padding:1.5rem 0;border-bottom:1px solid var(--border)}
+        .toc ul{list-style:none;display:flex;flex-wrap:wrap;gap:.5rem .75rem;justify-content:center;font-size:.875rem}
+
+        /* Sections */
+        main section{padding:2.5rem 0;border-bottom:1px solid var(--border)}
+        main section:last-child{border-bottom:none}
+        main h2{font-size:1.5rem;font-weight:700;margin-bottom:1rem;padding-bottom:.5rem;border-bottom:1px solid var(--border)}
+        main h3{font-size:1.15rem;font-weight:600;margin:1.5rem 0 .5rem}
+        main p{margin-bottom:.75rem}
+        main ul,main ol{margin:0 0 1rem 1.5rem}
+        main li{margin-bottom:.35rem}
+
+        /* Code */
+        code{font-family:"SFMono-Regular",Consolas,"Liberation Mono",Menlo,monospace;font-size:.875em;background:var(--code-bg);padding:.15em .35em;border-radius:3px}
+        pre{background:var(--code-bg);color:var(--code-fg);padding:1rem;border-radius:var(--radius);overflow-x:auto;margin-bottom:1rem;font-size:.85rem;line-height:1.5;border:1px solid var(--border)}
+        pre code{background:none;padding:0;font-size:inherit}
+
+        /* Tables */
+        table{width:100%;border-collapse:collapse;margin-bottom:1rem;font-size:.9rem}
+        th,td{text-align:left;padding:.5rem .75rem;border:1px solid var(--border)}
+        th{background:var(--bg-alt);font-weight:600}
+
+        /* Blockquote */
+        blockquote{border-left:3px solid var(--accent);padding:.5rem 1rem;margin:0 0 1rem;color:var(--fg-muted);background:var(--bg-alt);border-radius:0 var(--radius) var(--radius) 0}
+
+        /* Footer */
+        .site-footer{padding:2rem 0;text-align:center;color:var(--fg-muted);font-size:.85rem;border-top:1px solid var(--border)}
+        .site-footer a{color:var(--fg-muted)}
+        .site-footer a:hover{color:var(--accent)}
+        .footer-links{display:flex;gap:1.5rem;justify-content:center;margin-bottom:.5rem}
+
+        /* Features grid */
+        .features-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:1rem;margin-bottom:1rem}
+        .feature-card{background:var(--bg-alt);border:1px solid var(--border);border-radius:var(--radius);padding:1rem}
+        .feature-card strong{display:block;margin-bottom:.25rem}
+
+        /* Responsive */
+        @media(max-width:640px){
+            .hero h1{font-size:1.75rem}
+            .hero .tagline{font-size:1rem}
+            pre{font-size:.8rem;padding:.75rem}
+        }
+    </style>
+</head>
+<body>
+
+<header class="site-header">
+    <div class="container">
+        <a href="./" class="site-title">rmn</a>
+        <nav class="header-links">
+            <a href="https://github.com/nbifrye/rmn">GitHub</a>
+            <a href="https://github.com/nbifrye/rmn/releases">Releases</a>
+            <a href="./llms.txt">llms.txt</a>
+        </nav>
+    </div>
+</header>
+
+<section class="hero">
+    <div class="container">
+        <h1>rmn</h1>
+        <p class="tagline">A fast, open-source command-line client for <a href="https://www.redmine.org/">Redmine</a> written in Go. Manage issues from your terminal or let AI agents handle it via the built-in <a href="https://modelcontextprotocol.io/">MCP</a> server.</p>
+        <div class="badges">
+            <a href="https://github.com/nbifrye/rmn/actions/workflows/ci.yml" class="badge">CI: passing</a>
+            <a href="https://github.com/nbifrye/rmn/blob/main/go.mod" class="badge">Go 1.24</a>
+            <a href="https://github.com/nbifrye/rmn/blob/main/LICENSE" class="badge">MIT License</a>
+        </div>
+        <a href="#quick-start" class="cta">Get Started</a>
+    </div>
+</section>
+
+<nav class="toc" aria-label="Table of contents">
+    <div class="container">
+        <ul>
+            <li><a href="#features">Features</a></li>
+            <li><a href="#quick-start">Quick Start</a></li>
+            <li><a href="#installation">Installation</a></li>
+            <li><a href="#configuration">Configuration</a></li>
+            <li><a href="#usage">Usage</a></li>
+            <li><a href="#mcp-server">MCP Server</a></li>
+            <li><a href="#shell-completion">Shell Completion</a></li>
+            <li><a href="#security">Security</a></li>
+            <li><a href="#architecture">Architecture</a></li>
+            <li><a href="#development">Development</a></li>
+            <li><a href="#contributing">Contributing</a></li>
+        </ul>
+    </div>
+</nav>
+
+<main class="container">
+
+    <section id="features">
+        <h2>Features</h2>
+        <div class="features-grid">
+            <div class="feature-card">
+                <strong>Full Issue Lifecycle</strong>
+                List, view, create, update, close, and delete Redmine issues from the command line.
+            </div>
+            <div class="feature-card">
+                <strong>MCP Server for AI Agents</strong>
+                Expose Redmine operations to AI assistants like Claude Code via the Model Context Protocol.
+            </div>
+            <div class="feature-card">
+                <strong>Multiple Output Formats</strong>
+                Human-readable table (default) and machine-readable JSON for scripting and automation.
+            </div>
+            <div class="feature-card">
+                <strong>Flexible Filtering</strong>
+                Filter by project, status, assignee, and tracker with sorting and pagination support.
+            </div>
+            <div class="feature-card">
+                <strong>GitLab CLI-Inspired Aliases</strong>
+                Familiar shorthand commands (<code>ls</code>, <code>show</code>, <code>get</code>, <code>new</code>, <code>rm</code>) for faster workflows.
+            </div>
+            <div class="feature-card">
+                <strong>Six Installation Methods</strong>
+                Homebrew, mise, Nix, Go install, pre-built binaries, and build from source.
+            </div>
+            <div class="feature-card">
+                <strong>Shell Completion</strong>
+                Auto-complete for Bash, Zsh, Fish, and PowerShell.
+            </div>
+            <div class="feature-card">
+                <strong>XDG-Compliant Config</strong>
+                Respects <code>$XDG_CONFIG_HOME</code> for config file placement.
+            </div>
+            <div class="feature-card">
+                <strong>Security Hardened</strong>
+                TLS 1.2+ enforcement, secure file permissions (0600), and API key protection on redirects.
+            </div>
+            <div class="feature-card">
+                <strong>100% Test Coverage</strong>
+                Enforced in CI with every pull request.
+            </div>
+            <div class="feature-card">
+                <strong>Cross-Platform</strong>
+                Pre-built binaries for Linux, macOS, and Windows on both amd64 and arm64.
+            </div>
+        </div>
+    </section>
+
+    <section id="quick-start">
+        <h2>Quick Start</h2>
+<pre><code># 1. Install
+brew tap nbifrye/rmn https://github.com/nbifrye/rmn.git
+brew install nbifrye/rmn/rmn
+
+# 2. Authenticate
+rmn auth login --url https://your-redmine.example.com --api-key YOUR_API_KEY
+
+# 3. List your issues
+rmn issue list -a me
+
+# 4. View issue details
+rmn issue view 42</code></pre>
+    </section>
+
+    <section id="installation">
+        <h2>Installation</h2>
+        <p>Pre-built binaries are available for Linux, macOS, and Windows on both amd64 and arm64 architectures.</p>
+
+        <h3>Homebrew (macOS/Linux)</h3>
+<pre><code>brew tap nbifrye/rmn https://github.com/nbifrye/rmn.git
+brew install nbifrye/rmn/rmn</code></pre>
+
+        <h3>mise</h3>
+<pre><code>mise use -g ubi:nbifrye/rmn</code></pre>
+
+        <h3>Nix</h3>
+<pre><code>nix profile install github:nbifrye/rmn</code></pre>
+
+        <h3>Go</h3>
+<pre><code>go install github.com/nbifrye/rmn/cmd/rmn@latest</code></pre>
+
+        <h3>Binary download</h3>
+        <p>Download pre-built binaries from <a href="https://github.com/nbifrye/rmn/releases">GitHub Releases</a>.</p>
+
+        <h3>Build from source</h3>
+        <p>Requires Go 1.24 or later.</p>
+<pre><code>make build</code></pre>
+    </section>
+
+    <section id="configuration">
+        <h2>Configuration</h2>
+
+        <h3>Authentication</h3>
+<pre><code># Set up with flags
+rmn auth login --url https://your-redmine.example.com --api-key YOUR_API_KEY
+
+# Or interactively
+rmn auth login
+
+# Verify your configuration
+rmn auth status</code></pre>
+
+        <h3>Config file</h3>
+        <p>Configuration is stored in <code>~/.config/rmn/config.json</code> (or <code>$XDG_CONFIG_HOME/rmn/config.json</code> if set):</p>
+<pre><code>{
+  "redmine_url": "https://your-redmine.example.com",
+  "api_key": "your-api-key-here"
+}</code></pre>
+        <p>The config file is created with <code>0600</code> permissions. rmn refuses to read config files with insecure permissions.</p>
+
+        <h3>Per-command overrides</h3>
+        <p>Global flags <code>--redmine-url</code> and <code>--api-key</code> override the stored configuration for a single command:</p>
+<pre><code>rmn issue list --redmine-url https://other-redmine.example.com --api-key OTHER_KEY</code></pre>
+        <blockquote><strong>Warning:</strong> When connecting over plain HTTP, rmn displays a warning that your API key is sent in plaintext. Always prefer HTTPS.</blockquote>
+    </section>
+
+    <section id="usage">
+        <h2>Usage</h2>
+
+        <h3>Listing issues</h3>
+<pre><code>rmn issue list                                    # List open issues (default limit: 25)
+rmn issue list -p my-project                      # Filter by project
+rmn issue list -s closed                          # Filter by status (open, closed, *, or status ID)
+rmn issue list -a me                              # Issues assigned to you
+rmn issue list -t 2                               # Filter by tracker ID
+rmn issue list --sort updated_on:desc             # Sort by column
+rmn issue list -l 50 --offset 100                 # Pagination
+rmn issue list -p my-project -s closed -a me      # Combine filters</code></pre>
+
+        <h3>Viewing issues</h3>
+<pre><code>rmn issue view 42                                 # View issue details</code></pre>
+
+        <h3>Creating issues</h3>
+<pre><code>rmn issue create -p my-project -s "Bug report"
+rmn issue create -p my-project -s "Feature request" -d "Detailed description" \
+  -t 2 --priority 3 -a 5 --start-date 2025-01-01 --due-date 2025-03-31</code></pre>
+        <p>All create flags: <code>--project/-p</code> (required), <code>--subject/-s</code> (required), <code>--description/-d</code>, <code>--tracker/-t</code>, <code>--priority</code>, <code>--assignee/-a</code>, <code>--category</code>, <code>--version</code>, <code>--parent</code>, <code>--start-date</code>, <code>--due-date</code>, <code>--estimated-hours</code>, <code>--done-ratio</code>.</p>
+
+        <h3>Updating issues</h3>
+<pre><code>rmn issue update 42 --status 3                    # Change status
+rmn issue update 42 -n "Work in progress"         # Add a note
+rmn issue update 42 --done-ratio 50 --priority 2  # Update multiple fields</code></pre>
+        <p>Only specified fields are changed; omitted fields remain unchanged. All create flags are available, plus <code>--status</code> and <code>--notes/-n</code>.</p>
+
+        <h3>Closing issues</h3>
+<pre><code>rmn issue close 42                                # Close (status ID 5 by default)
+rmn issue close 42 --status 6                     # Close with custom status ID
+rmn issue close 42 -n "Fixed in v1.2"             # Close with a note</code></pre>
+
+        <h3>Deleting issues</h3>
+<pre><code>rmn issue delete 42                               # Delete with confirmation prompt
+rmn issue delete 42 -y                            # Skip confirmation</code></pre>
+
+        <h3>Command Aliases</h3>
+        <table>
+            <thead>
+                <tr><th>Command</th><th>Aliases</th></tr>
+            </thead>
+            <tbody>
+                <tr><td><code>rmn issue list</code></td><td><code>ls</code></td></tr>
+                <tr><td><code>rmn issue view</code></td><td><code>show</code>, <code>get</code></td></tr>
+                <tr><td><code>rmn issue create</code></td><td><code>new</code></td></tr>
+                <tr><td><code>rmn issue delete</code></td><td><code>rm</code></td></tr>
+            </tbody>
+        </table>
+<pre><code>rmn issue ls                    # Same as: rmn issue list
+rmn issue show 42               # Same as: rmn issue view 42
+rmn issue new -p proj -s "Bug"  # Same as: rmn issue create ...
+rmn issue rm 42                 # Same as: rmn issue delete 42</code></pre>
+
+        <h3>Global Flags</h3>
+        <table>
+            <thead>
+                <tr><th>Flag</th><th>Description</th></tr>
+            </thead>
+            <tbody>
+                <tr><td><code>--output</code></td><td>Output format: <code>table</code> (default) or <code>json</code></td></tr>
+                <tr><td><code>--redmine-url</code></td><td>Override Redmine instance URL</td></tr>
+                <tr><td><code>--api-key</code></td><td>Override Redmine API key</td></tr>
+            </tbody>
+        </table>
+
+        <h3>JSON Output</h3>
+        <p>Use <code>--output json</code> on any command for machine-readable output, useful for scripting and piping:</p>
+<pre><code>rmn issue list --output json                      # JSON array of issues
+rmn issue view 42 --output json                   # Full issue as JSON
+rmn issue list -p my-project --output json | jq '.issues[].subject'</code></pre>
+    </section>
+
+    <section id="mcp-server">
+        <h2>MCP Server</h2>
+        <p>rmn includes a built-in <a href="https://modelcontextprotocol.io/">Model Context Protocol (MCP)</a> server that exposes Redmine operations to AI agents. This allows AI assistants like Claude Code to manage Redmine issues through natural language.</p>
+
+        <h3>Starting the MCP server</h3>
+<pre><code>rmn mcp serve</code></pre>
+        <p>This starts a stdio-based MCP server.</p>
+
+        <h3>Available MCP tools</h3>
+        <table>
+            <thead>
+                <tr><th>Tool</th><th>Description</th><th>Read-only</th><th>Destructive</th></tr>
+            </thead>
+            <tbody>
+                <tr><td><code>list_issues</code></td><td>List and filter Redmine issues</td><td>Yes</td><td>No</td></tr>
+                <tr><td><code>get_issue</code></td><td>Get full details of an issue</td><td>Yes</td><td>No</td></tr>
+                <tr><td><code>create_issue</code></td><td>Create a new issue</td><td>No</td><td>No</td></tr>
+                <tr><td><code>update_issue</code></td><td>Update an existing issue</td><td>No</td><td>No</td></tr>
+                <tr><td><code>delete_issue</code></td><td>Permanently delete an issue</td><td>No</td><td>Yes</td></tr>
+            </tbody>
+        </table>
+        <p>Each tool includes MCP annotations (<code>readOnlyHint</code>, <code>destructiveHint</code>, <code>idempotentHint</code>, <code>openWorldHint</code>) to help AI agents understand the impact of each operation.</p>
+
+        <h3>Claude Code integration</h3>
+        <p>Add the following to your MCP configuration (e.g. <code>~/.claude/claude_desktop_config.json</code> or project <code>.mcp.json</code>):</p>
+<pre><code>{
+  "mcpServers": {
+    "rmn-redmine": {
+      "command": "rmn",
+      "args": ["mcp", "serve"]
+    }
+  }
+}</code></pre>
+        <p>Once configured, your AI agent can list, create, update, and close Redmine issues through conversational commands.</p>
+    </section>
+
+    <section id="shell-completion">
+        <h2>Shell Completion</h2>
+<pre><code># Bash
+source &lt;(rmn completion bash)
+
+# Zsh
+rmn completion zsh &gt; "${fpath[1]}/_rmn"
+
+# Fish
+rmn completion fish | source
+
+# PowerShell
+rmn completion powershell | Out-String | Invoke-Expression</code></pre>
+    </section>
+
+    <section id="security">
+        <h2>Security</h2>
+        <ul>
+            <li><strong>TLS 1.2+</strong> — all HTTPS connections enforce TLS 1.2 as the minimum version</li>
+            <li><strong>Secure file permissions</strong> — config files are created with <code>0600</code> and config directories with <code>0700</code>; rmn refuses to read files with insecure permissions</li>
+            <li><strong>API key protection</strong> — the API key header is automatically removed on cross-origin redirects to prevent credential leakage</li>
+            <li><strong>HTTP warning</strong> — a warning is displayed when connecting over plain HTTP</li>
+        </ul>
+    </section>
+
+    <section id="architecture">
+        <h2>Architecture</h2>
+<pre><code>cmd/rmn/main.go          Entry point (signal handling, factory, root command)
+internal/api/             Redmine HTTP client + domain types
+internal/commands/        Cobra command tree (root, auth, issue, mcp)
+internal/cmdutil/         Factory (dependency injection), IOStreams
+internal/config/          XDG-compliant JSON config (~/.config/rmn/config.json)</code></pre>
+        <p>rmn uses <a href="https://github.com/spf13/cobra">Cobra</a> for the CLI framework and <a href="https://github.com/mark3labs/mcp-go">mcp-go</a> for the MCP server implementation. The codebase follows a factory pattern for dependency injection, making all commands testable with mock HTTP servers.</p>
+    </section>
+
+    <section id="development">
+        <h2>Development</h2>
+<pre><code>make build    # Build binary
+make test     # Run all tests
+make vet      # Static analysis
+make lint     # Run linters (requires golangci-lint)
+make cover    # Coverage report (enforces 100% coverage)
+make install  # Install to $GOPATH/bin
+make clean    # Remove build artifacts</code></pre>
+        <p>All pull requests must pass CI, which enforces:</p>
+        <ul>
+            <li><code>go vet ./...</code> with zero warnings</li>
+            <li>100% test coverage</li>
+        </ul>
+    </section>
+
+    <section id="contributing">
+        <h2>Contributing</h2>
+        <ol>
+            <li>Fork the repository</li>
+            <li>Create a feature branch (<code>git checkout -b feature/my-feature</code>)</li>
+            <li>Make your changes</li>
+            <li>Ensure tests pass: <code>make test &amp;&amp; make vet</code></li>
+            <li>Commit and push</li>
+            <li>Open a pull request</li>
+        </ol>
+        <p>Please follow the existing code style: one file per subcommand, table-driven tests with <code>httptest.NewServer</code>, and <code>fmt.Errorf("context: %w", err)</code> for error wrapping.</p>
+    </section>
+
+</main>
+
+<footer class="site-footer">
+    <div class="container">
+        <nav class="footer-links">
+            <a href="https://github.com/nbifrye/rmn">GitHub</a>
+            <a href="https://github.com/nbifrye/rmn/releases">Releases</a>
+            <a href="https://github.com/nbifrye/rmn/blob/main/LICENSE">License</a>
+            <a href="./llms.txt">llms.txt</a>
+        </nav>
+        <p>MIT License &copy; nbifrye</p>
+    </div>
+</footer>
+
+</body>
+</html>
