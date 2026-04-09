@@ -1,0 +1,49 @@
+# rmn
+
+> rmn is an unofficial command-line client for Redmine written in Go. It provides full issue lifecycle management (list, view, create, update, close, delete) and a built-in Model Context Protocol (MCP) server for AI agent integration.
+
+## Docs
+
+- [Documentation](https://nbifrye.github.io/rmn/): Full documentation site
+- [GitHub Repository](https://github.com/nbifrye/rmn): Source code, issues, releases
+- [Full docs for LLMs](https://nbifrye.github.io/rmn/llms-full.txt): Complete documentation in plain text
+
+## Installation
+
+Install via Homebrew (`brew tap nbifrye/rmn https://github.com/nbifrye/rmn.git && brew install nbifrye/rmn/rmn`), mise (`mise use -g ubi:nbifrye/rmn`), Nix (`nix profile install github:nbifrye/rmn`), Go (`go install github.com/nbifrye/rmn/cmd/rmn@latest`), or download pre-built binaries from GitHub Releases.
+
+## Configuration
+
+Run `rmn auth login --url https://your-redmine.example.com --api-key YOUR_API_KEY` to authenticate. Config is stored in `~/.config/rmn/config.json` (XDG-compliant). Per-command overrides available via `--redmine-url` and `--api-key` flags.
+
+## CLI Commands
+
+- `rmn issue list` (alias: `ls`) — List issues with filters: `-p` project, `-s` status, `-a` assignee, `-t` tracker, `--sort`, `-l` limit, `--offset`
+- `rmn issue view <id>` (aliases: `show`, `get`) — View issue details
+- `rmn issue create` (alias: `new`) — Create issue: `-p` project (required), `-s` subject (required), `-d` description, `-t` tracker, `--priority`, `-a` assignee
+- `rmn issue update <id>` — Update issue fields and add notes with `-n`
+- `rmn issue close <id>` — Close issue (default status 5), with optional `--status` and `-n`
+- `rmn issue delete <id>` (alias: `rm`) — Delete issue, `-y` to skip confirmation
+- `rmn auth login` — Authenticate with Redmine instance
+- `rmn auth status` — Show authentication status
+- Global flags: `--output` (table/json), `--redmine-url`, `--api-key`
+
+## MCP Server
+
+Start with `rmn mcp serve` (stdio transport). Available tools: `list_issues`, `get_issue`, `create_issue`, `update_issue`, `delete_issue`. Each tool includes MCP annotations (readOnlyHint, destructiveHint, idempotentHint, openWorldHint).
+
+Configure in Claude Code:
+```json
+{
+  "mcpServers": {
+    "rmn-redmine": {
+      "command": "rmn",
+      "args": ["mcp", "serve"]
+    }
+  }
+}
+```
+
+## Optional
+
+- [License: MIT](https://github.com/nbifrye/rmn/blob/main/LICENSE)

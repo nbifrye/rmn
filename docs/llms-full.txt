@@ -1,0 +1,317 @@
+# rmn - Redmine CLI
+
+> rmn is an unofficial command-line client for Redmine written in Go. It provides a fast, intuitive interface for managing Redmine issues directly from your terminal. Inspired by GitLab CLI (glab), rmn brings familiar command patterns to the Redmine ecosystem.
+
+rmn also includes a built-in Model Context Protocol (MCP) server, enabling AI agents such as Claude Code to interact with your Redmine instance through natural language. Whether you prefer the keyboard or an AI assistant, rmn gives you full control over Redmine issue management via the Redmine REST API.
+
+Note: This project is not affiliated with or endorsed by the Redmine project. It is an independent, community-driven tool.
+
+## Features
+
+- Full issue lifecycle management — list, view, create, update, close, and delete Redmine issues from the command line
+- MCP server for AI agents — expose Redmine operations to AI assistants like Claude Code via the Model Context Protocol
+- Multiple output formats — human-readable table (default) and machine-readable JSON for scripting and automation
+- Flexible issue filtering — filter by project, status, assignee, and tracker with sorting and pagination support
+- GitLab CLI-inspired aliases — familiar shorthand commands (ls, show, get, new, rm) for faster workflows
+- Six installation methods — Homebrew, mise, Nix, Go install, pre-built binaries, and build from source
+- Shell completion — auto-complete for Bash, Zsh, Fish, and PowerShell
+- XDG-compliant configuration — respects $XDG_CONFIG_HOME for config file placement
+- Security hardened — TLS 1.2+ enforcement, secure file permissions (0600), and API key protection on redirects
+- 100% test coverage — enforced in CI with every pull request
+- Cross-platform — pre-built binaries for Linux, macOS, and Windows on both amd64 and arm64
+
+## Quick Start
+
+```bash
+# 1. Install
+brew tap nbifrye/rmn https://github.com/nbifrye/rmn.git
+brew install nbifrye/rmn/rmn
+
+# 2. Authenticate
+rmn auth login --url https://your-redmine.example.com --api-key YOUR_API_KEY
+
+# 3. List your issues
+rmn issue list -a me
+
+# 4. View issue details
+rmn issue view 42
+```
+
+## Installation
+
+Pre-built binaries are available for Linux, macOS, and Windows on both amd64 and arm64 architectures.
+
+### Homebrew (macOS/Linux)
+
+```bash
+brew tap nbifrye/rmn https://github.com/nbifrye/rmn.git
+brew install nbifrye/rmn/rmn
+```
+
+### mise
+
+```bash
+mise use -g ubi:nbifrye/rmn
+```
+
+### Nix
+
+```bash
+nix profile install github:nbifrye/rmn
+```
+
+### Go
+
+```bash
+go install github.com/nbifrye/rmn/cmd/rmn@latest
+```
+
+### Binary download
+
+Download pre-built binaries from GitHub Releases: https://github.com/nbifrye/rmn/releases
+
+### Build from source
+
+Requires Go 1.24 or later.
+
+```bash
+make build
+```
+
+## Configuration
+
+### Authentication
+
+```bash
+# Set up with flags
+rmn auth login --url https://your-redmine.example.com --api-key YOUR_API_KEY
+
+# Or interactively
+rmn auth login
+
+# Verify your configuration
+rmn auth status
+```
+
+### Config file
+
+Configuration is stored in ~/.config/rmn/config.json (or $XDG_CONFIG_HOME/rmn/config.json if set):
+
+```json
+{
+  "redmine_url": "https://your-redmine.example.com",
+  "api_key": "your-api-key-here"
+}
+```
+
+The config file is created with 0600 permissions. rmn refuses to read config files with insecure permissions.
+
+### Per-command overrides
+
+Global flags --redmine-url and --api-key override the stored configuration for a single command:
+
+```bash
+rmn issue list --redmine-url https://other-redmine.example.com --api-key OTHER_KEY
+```
+
+Warning: When connecting over plain HTTP, rmn displays a warning that your API key is sent in plaintext. Always prefer HTTPS.
+
+## Usage
+
+### Issues
+
+#### Listing issues
+
+```bash
+rmn issue list                                    # List open issues (default limit: 25)
+rmn issue list -p my-project                      # Filter by project
+rmn issue list -s closed                          # Filter by status (open, closed, *, or status ID)
+rmn issue list -a me                              # Issues assigned to you
+rmn issue list -t 2                               # Filter by tracker ID
+rmn issue list --sort updated_on:desc             # Sort by column
+rmn issue list -l 50 --offset 100                 # Pagination
+rmn issue list -p my-project -s closed -a me      # Combine filters
+```
+
+#### Viewing issues
+
+```bash
+rmn issue view 42                                 # View issue details
+```
+
+#### Creating issues
+
+```bash
+rmn issue create -p my-project -s "Bug report"
+rmn issue create -p my-project -s "Feature request" -d "Detailed description" \
+  -t 2 --priority 3 -a 5 --start-date 2025-01-01 --due-date 2025-03-31
+```
+
+All create flags: --project/-p (required), --subject/-s (required), --description/-d, --tracker/-t, --priority, --assignee/-a, --category, --version, --parent, --start-date, --due-date, --estimated-hours, --done-ratio.
+
+#### Updating issues
+
+```bash
+rmn issue update 42 --status 3                    # Change status
+rmn issue update 42 -n "Work in progress"         # Add a note
+rmn issue update 42 --done-ratio 50 --priority 2  # Update multiple fields
+```
+
+Only specified fields are changed; omitted fields remain unchanged. All create flags are available, plus --status and --notes/-n.
+
+#### Closing issues
+
+```bash
+rmn issue close 42                                # Close (status ID 5 by default)
+rmn issue close 42 --status 6                     # Close with custom status ID
+rmn issue close 42 -n "Fixed in v1.2"             # Close with a note
+```
+
+#### Deleting issues
+
+```bash
+rmn issue delete 42                               # Delete with confirmation prompt
+rmn issue delete 42 -y                            # Skip confirmation
+```
+
+### Command Aliases
+
+| Command              | Aliases        |
+|----------------------|----------------|
+| rmn issue list       | ls             |
+| rmn issue view       | show, get      |
+| rmn issue create     | new            |
+| rmn issue delete     | rm             |
+
+```bash
+rmn issue ls                    # Same as: rmn issue list
+rmn issue show 42               # Same as: rmn issue view 42
+rmn issue new -p proj -s "Bug"  # Same as: rmn issue create ...
+rmn issue rm 42                 # Same as: rmn issue delete 42
+```
+
+### Global Flags
+
+| Flag             | Description                              |
+|------------------|------------------------------------------|
+| --output         | Output format: table (default) or json   |
+| --redmine-url    | Override Redmine instance URL            |
+| --api-key        | Override Redmine API key                 |
+
+### JSON Output
+
+Use --output json on any command for machine-readable output, useful for scripting and piping:
+
+```bash
+rmn issue list --output json                      # JSON array of issues
+rmn issue view 42 --output json                   # Full issue as JSON
+rmn issue list -p my-project --output json | jq '.issues[].subject'
+```
+
+## MCP Server
+
+rmn includes a built-in Model Context Protocol (MCP) server that exposes Redmine operations to AI agents. This allows AI assistants like Claude Code to manage Redmine issues through natural language.
+
+### Starting the MCP server
+
+```bash
+rmn mcp serve
+```
+
+This starts a stdio-based MCP server.
+
+### Available MCP tools
+
+| Tool             | Description                          | Read-only | Destructive |
+|------------------|--------------------------------------|-----------|-------------|
+| list_issues      | List and filter Redmine issues       | Yes       | No          |
+| get_issue        | Get full details of an issue         | Yes       | No          |
+| create_issue     | Create a new issue                   | No        | No          |
+| update_issue     | Update an existing issue             | No        | No          |
+| delete_issue     | Permanently delete an issue          | No        | Yes         |
+
+Each tool includes MCP annotations (readOnlyHint, destructiveHint, idempotentHint, openWorldHint) to help AI agents understand the impact of each operation.
+
+### Claude Code integration
+
+Add the following to your MCP configuration (e.g. ~/.claude/claude_desktop_config.json or project .mcp.json):
+
+```json
+{
+  "mcpServers": {
+    "rmn-redmine": {
+      "command": "rmn",
+      "args": ["mcp", "serve"]
+    }
+  }
+}
+```
+
+Once configured, your AI agent can list, create, update, and close Redmine issues through conversational commands.
+
+## Shell Completion
+
+```bash
+# Bash
+source <(rmn completion bash)
+
+# Zsh
+rmn completion zsh > "${fpath[1]}/_rmn"
+
+# Fish
+rmn completion fish | source
+
+# PowerShell
+rmn completion powershell | Out-String | Invoke-Expression
+```
+
+## Security
+
+- TLS 1.2+ — all HTTPS connections enforce TLS 1.2 as the minimum version
+- Secure file permissions — config files are created with 0600 and config directories with 0700; rmn refuses to read files with insecure permissions
+- API key protection — the API key header is automatically removed on cross-origin redirects to prevent credential leakage
+- HTTP warning — a warning is displayed when connecting over plain HTTP
+
+## Architecture
+
+```
+cmd/rmn/main.go          Entry point (signal handling, factory, root command)
+internal/api/             Redmine HTTP client + domain types
+internal/commands/        Cobra command tree (root, auth, issue, mcp)
+internal/cmdutil/         Factory (dependency injection), IOStreams
+internal/config/          XDG-compliant JSON config (~/.config/rmn/config.json)
+```
+
+rmn uses Cobra for the CLI framework and mcp-go for the MCP server implementation. The codebase follows a factory pattern for dependency injection, making all commands testable with mock HTTP servers.
+
+## Development
+
+```bash
+make build    # Build binary
+make test     # Run all tests
+make vet      # Static analysis
+make lint     # Run linters (requires golangci-lint)
+make cover    # Coverage report (enforces 100% coverage)
+make install  # Install to $GOPATH/bin
+make clean    # Remove build artifacts
+```
+
+All pull requests must pass CI, which enforces:
+- go vet ./... with zero warnings
+- 100% test coverage
+
+## Contributing
+
+1. Fork the repository
+2. Create a feature branch (git checkout -b feature/my-feature)
+3. Make your changes
+4. Ensure tests pass: make test && make vet
+5. Commit and push
+6. Open a pull request
+
+Please follow the existing code style: one file per subcommand, table-driven tests with httptest.NewServer, and fmt.Errorf("context: %w", err) for error wrapping.
+
+## License
+
+This project is licensed under the MIT License.
+Source: https://github.com/nbifrye/rmn
