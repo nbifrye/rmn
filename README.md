@@ -3,6 +3,7 @@
 [![CI](https://github.com/nbifrye/rmn/actions/workflows/ci.yml/badge.svg)](https://github.com/nbifrye/rmn/actions/workflows/ci.yml)
 [![Go Version](https://img.shields.io/github/go-mod/go-version/nbifrye/rmn)](https://github.com/nbifrye/rmn/blob/main/go.mod)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://github.com/nbifrye/rmn/blob/main/LICENSE)
+[![Docs](https://img.shields.io/badge/docs-GitHub%20Pages-blue)](https://nbifrye.github.io/rmn/)
 
 **rmn** is an unofficial command-line client for [Redmine](https://www.redmine.org/) written in Go. It provides a fast, intuitive interface for managing Redmine issues directly from your terminal. Inspired by [GitLab CLI (glab)](https://gitlab.com/gitlab-org/cli), rmn brings familiar command patterns to the Redmine ecosystem.
 
