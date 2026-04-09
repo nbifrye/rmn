@@ -6,6 +6,8 @@ rmn also includes a built-in Model Context Protocol (MCP) server, enabling AI ag
 
 Note: This project is not affiliated with or endorsed by the Redmine project. It is an independent, community-driven tool.
 
+Warning: This project is experimental. The API and CLI interface are not yet stable and may introduce breaking changes without notice.
+
 ## Features
 
 - Full issue lifecycle management — list, view, create, update, close, and delete Redmine issues from the command line
