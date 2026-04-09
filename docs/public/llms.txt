@@ -2,6 +2,8 @@
 
 > rmn is an unofficial command-line client for Redmine written in Go. It provides full issue lifecycle management (list, view, create, update, close, delete) and a built-in Model Context Protocol (MCP) server for AI agent integration.
 
+> Warning: This project is experimental. The API and CLI interface are not yet stable and may introduce breaking changes without notice.
+
 ## Docs
 
 - [Documentation](https://nbifrye.github.io/rmn/): Full documentation site

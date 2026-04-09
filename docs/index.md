@@ -40,6 +40,10 @@ features:
     details: Pre-built binaries for Linux, macOS, and Windows on both amd64 and arm64.
 ---
 
+::: warning
+This project is experimental. The API and CLI interface are not yet stable and may introduce breaking changes without notice.
+:::
+
 ## Quick Start
 
 ```bash
