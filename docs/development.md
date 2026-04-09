@@ -29,3 +29,14 @@ All pull requests must pass CI, which enforces:
 6. Open a pull request
 
 Please follow the existing code style: one file per subcommand, table-driven tests with `httptest.NewServer`, and `fmt.Errorf("context: %w", err)` for error wrapping.
+
+## Documentation
+
+When your changes affect user-facing behavior (new commands, changed flags, new MCP tools), update:
+1. `README.md` — the relevant section
+2. `docs/` — the corresponding VitePress page
+3. `docs/public/llms.txt` and `llms-full.txt` — if CLI commands or MCP tools changed
+
+See `CLAUDE.md` for the full code → documentation mapping.
+
+CI will post a reminder comment on PRs that modify user-facing code without documentation changes.
