@@ -1,0 +1,324 @@
+# rmn
+
+[![CI](https://github.com/nbifrye/rmn/actions/workflows/ci.yml/badge.svg)](https://github.com/nbifrye/rmn/actions/workflows/ci.yml)
+[![Go Version](https://img.shields.io/github/go-mod/go-version/nbifrye/rmn)](https://github.com/nbifrye/rmn/blob/main/go.mod)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://github.com/nbifrye/rmn/blob/main/LICENSE)
+[![Docs](https://img.shields.io/badge/docs-GitHub%20Pages-blue)](https://nbifrye.github.io/rmn/ja/)
+
+**[English README](README.md)**
+
+**rmn** は [Redmine](https://www.redmine.org/) 用の非公式コマンドラインクライアントで、Go言語で書かれています。ターミナルからRedmineチケットを直接管理するための高速で直感的なインターフェースを提供します。[GitLab CLI（glab）](https://gitlab.com/gitlab-org/cli)にインスパイアされ、rmnはRedmineエコシステムにおなじみのコマンドパターンを導入します。
+
+rmnには[Model Context Protocol（MCP）](https://modelcontextprotocol.io/)サーバーも内蔵されており、Claude CodeなどのAIエージェントが自然言語でRedmineインスタンスとやり取りできるようにします。キーボードでもAIアシスタントでも、rmnはRedmine REST APIを通じてRedmineチケット管理を完全に制御します。
+
+> **注意:** このプロジェクトはRedmineプロジェクトとは関係がなく、承認もされていません。独立したコミュニティ主導のツールです。
+
+## 機能
+
+- **チケットのライフサイクル管理** -- Redmineチケットをコマンドラインから一覧表示、閲覧、作成、更新、クローズ、削除
+- **AIエージェント向けMCPサーバー** -- Model Context Protocolを通じてClaude CodeなどのAIアシスタントにRedmine操作を公開
+- **複数の出力形式** -- 人間が読みやすいテーブル形式（デフォルト）と、スクリプトや自動化に便利な機械可読JSON形式
+- **柔軟なチケットフィルタリング** -- プロジェクト、ステータス、担当者、トラッカーでフィルタリング。ソートとページネーションにも対応
+- **GitLab CLI風エイリアス** -- おなじみの短縮コマンド（`ls`、`show`、`get`、`new`、`rm`）でワークフローを高速化
+- **6つのインストール方法** -- Homebrew、mise、Nix、Go install、ビルド済みバイナリ、ソースからビルド
+- **シェル補完** -- Bash、Zsh、Fish、PowerShellの自動補完に対応
+- **XDG準拠の設定** -- `$XDG_CONFIG_HOME` に準拠した設定ファイルの配置
+- **セキュリティ強化** -- TLS 1.2+の強制、安全なファイルパーミッション（0600）、リダイレクト時のAPIキー保護
+- **テストカバレッジ100%** -- すべてのプルリクエストでCIにより強制
+- **クロスプラットフォーム** -- Linux、macOS、Windowsのamd64およびarm64向けビルド済みバイナリ
+
+## クイックスタート
+
+```bash
+# 1. インストール
+brew tap nbifrye/rmn https://github.com/nbifrye/rmn.git
+brew install nbifrye/rmn/rmn
+
+# 2. 認証
+rmn auth login --url https://your-redmine.example.com --api-key YOUR_API_KEY
+
+# 3. チケットを一覧表示
+rmn issue list -a me
+
+# 4. チケットの詳細を表示
+rmn issue view 42
+```
+
+## インストール
+
+Linux、macOS、Windows向けのamd64およびarm64アーキテクチャ用ビルド済みバイナリが利用可能です。
+
+### Homebrew（macOS/Linux）
+
+```bash
+brew tap nbifrye/rmn https://github.com/nbifrye/rmn.git
+brew install nbifrye/rmn/rmn
+```
+
+### mise
+
+```bash
+mise use -g ubi:nbifrye/rmn
+```
+
+### Nix
+
+```bash
+nix profile install github:nbifrye/rmn
+```
+
+### Go
+
+```bash
+go install github.com/nbifrye/rmn/cmd/rmn@latest
+```
+
+### バイナリダウンロード
+
+[GitHub Releases](https://github.com/nbifrye/rmn/releases)からビルド済みバイナリをダウンロードできます。
+
+### ソースからビルド
+
+Go 1.24以降が必要です。
+
+```bash
+make build
+```
+
+## 設定
+
+### 認証
+
+```bash
+# フラグを使って設定
+rmn auth login --url https://your-redmine.example.com --api-key YOUR_API_KEY
+
+# または対話形式で
+rmn auth login
+
+# 設定を確認
+rmn auth status
+```
+
+### 設定ファイル
+
+設定は `~/.config/rmn/config.json`（`$XDG_CONFIG_HOME` が設定されている場合は `$XDG_CONFIG_HOME/rmn/config.json`）に保存されます：
+
+```json
+{
+  "redmine_url": "https://your-redmine.example.com",
+  "api_key": "your-api-key-here"
+}
+```
+
+設定ファイルは `0600` パーミッションで作成されます。rmnは安全でないパーミッションの設定ファイルの読み取りを拒否します。
+
+### コマンド単位のオーバーライド
+
+グローバルフラグ `--redmine-url` と `--api-key` で、単一コマンドの保存済み設定をオーバーライドできます：
+
+```bash
+rmn issue list --redmine-url https://other-redmine.example.com --api-key OTHER_KEY
+```
+
+> **警告:** 平文HTTP接続時、rmnはAPIキーが平文で送信されることを警告します。常にHTTPSを使用してください。
+
+## 使い方
+
+### チケット
+
+#### チケットの一覧表示
+
+```bash
+rmn issue list                                    # オープンなチケットを一覧表示（デフォルト上限: 25）
+rmn issue list -p my-project                      # プロジェクトでフィルタ
+rmn issue list -s closed                          # ステータスでフィルタ（open, closed, *, またはステータスID）
+rmn issue list -a me                              # 自分に割り当てられたチケット
+rmn issue list -t 2                               # トラッカーIDでフィルタ
+rmn issue list --sort updated_on:desc             # カラムでソート
+rmn issue list -l 50 --offset 100                 # ページネーション
+rmn issue list -p my-project -s closed -a me      # フィルタを組み合わせ
+```
+
+#### チケットの閲覧
+
+```bash
+rmn issue view 42                                 # チケットの詳細を表示
+```
+
+#### チケットの作成
+
+```bash
+rmn issue create -p my-project -s "Bug report"
+rmn issue create -p my-project -s "Feature request" -d "Detailed description" \
+  -t 2 --priority 3 -a 5 --start-date 2025-01-01 --due-date 2025-03-31
+```
+
+作成時の全フラグ: `--project/-p`（必須）、`--subject/-s`（必須）、`--description/-d`、`--tracker/-t`、`--priority`、`--assignee/-a`、`--category`、`--version`、`--parent`、`--start-date`、`--due-date`、`--estimated-hours`、`--done-ratio`。
+
+#### チケットの更新
+
+```bash
+rmn issue update 42 --status 3                    # ステータスを変更
+rmn issue update 42 -n "Work in progress"         # ノートを追加
+rmn issue update 42 --done-ratio 50 --priority 2  # 複数フィールドを更新
+```
+
+指定されたフィールドのみ変更され、省略されたフィールドは変更されません。作成時の全フラグに加えて、`--status` と `--notes/-n` が使用可能です。
+
+#### チケットのクローズ
+
+```bash
+rmn issue close 42                                # クローズ（デフォルトのステータスID 5）
+rmn issue close 42 --status 6                     # カスタムステータスIDでクローズ
+rmn issue close 42 -n "Fixed in v1.2"             # ノート付きでクローズ
+```
+
+#### チケットの削除
+
+```bash
+rmn issue delete 42                               # 確認プロンプト付きで削除
+rmn issue delete 42 -y                            # Skip confirmation
+```
+
+### コマンドエイリアス
+
+| コマンド             | エイリアス     |
+|----------------------|----------------|
+| `rmn issue list`     | `ls`           |
+| `rmn issue view`     | `show`, `get`  |
+| `rmn issue create`   | `new`          |
+| `rmn issue delete`   | `rm`           |
+
+```bash
+rmn issue ls                    # rmn issue list と同じ
+rmn issue show 42               # rmn issue view 42 と同じ
+rmn issue new -p proj -s "Bug"  # rmn issue create ... と同じ
+rmn issue rm 42                 # rmn issue delete 42 と同じ
+```
+
+### グローバルフラグ
+
+| フラグ           | 説明                                     |
+|------------------|------------------------------------------|
+| `--output`       | 出力形式: `table`（デフォルト）または `json` |
+| `--redmine-url`  | RedmineインスタンスURLをオーバーライド   |
+| `--api-key`      | Redmine APIキーをオーバーライド          |
+
+### JSON出力
+
+`--output json` を任意のコマンドに指定すると、スクリプトやパイプに便利な機械可読出力が得られます：
+
+```bash
+rmn issue list --output json                      # チケットのJSON配列
+rmn issue view 42 --output json                   # チケット全体をJSONで表示
+rmn issue list -p my-project --output json | jq '.issues[].subject'
+```
+
+## MCPサーバー
+
+rmnには[Model Context Protocol（MCP）](https://modelcontextprotocol.io/)サーバーが内蔵されており、AIエージェントにRedmine操作を公開します。これにより、Claude CodeなどのAIアシスタントが自然言語でRedmineチケットを管理できるようになります。
+
+### MCPサーバーの起動
+
+```bash
+rmn mcp serve
+```
+
+stdio方式のMCPサーバーが起動します。
+
+### 利用可能なMCPツール
+
+| ツール           | 説明                                 | 読み取り専用 | 破壊的 |
+|------------------|--------------------------------------|-------------|--------|
+| `list_issues`    | Redmineチケットの一覧表示・フィルタ  | はい        | いいえ |
+| `get_issue`      | チケットの詳細を取得                  | はい        | いいえ |
+| `create_issue`   | 新しいチケットを作成                  | いいえ      | いいえ |
+| `update_issue`   | 既存のチケットを更新                  | いいえ      | いいえ |
+| `delete_issue`   | チケットを完全に削除                  | いいえ      | はい   |
+
+各ツールにはMCPアノテーション（`readOnlyHint`、`destructiveHint`、`idempotentHint`、`openWorldHint`）が含まれており、AIエージェントが各操作の影響を理解するのに役立ちます。
+
+### Claude Code連携
+
+MCP設定ファイル（例: `~/.claude/claude_desktop_config.json` またはプロジェクトの `.mcp.json`）に以下を追加します：
+
+```json
+{
+  "mcpServers": {
+    "rmn-redmine": {
+      "command": "rmn",
+      "args": ["mcp", "serve"]
+    }
+  }
+}
+```
+
+設定が完了すると、AIエージェントが会話形式のコマンドでRedmineチケットの一覧表示、作成、更新、クローズを行えるようになります。
+
+## シェル補完
+
+```bash
+# Bash
+source <(rmn completion bash)
+
+# Zsh
+rmn completion zsh > "${fpath[1]}/_rmn"
+
+# Fish
+rmn completion fish | source
+
+# PowerShell
+rmn completion powershell | Out-String | Invoke-Expression
+```
+
+## セキュリティ
+
+- **TLS 1.2+** -- すべてのHTTPS接続でTLS 1.2を最低バージョンとして強制
+- **安全なファイルパーミッション** -- 設定ファイルは `0600`、設定ディレクトリは `0700` で作成。rmnは安全でないパーミッションのファイルの読み取りを拒否
+- **APIキー保護** -- クロスオリジンリダイレクト時にAPIキーヘッダーを自動的に削除し、認証情報の漏洩を防止
+- **HTTP警告** -- 平文HTTP接続時に警告を表示
+
+## アーキテクチャ
+
+```
+cmd/rmn/main.go          エントリーポイント（シグナル処理、ファクトリ、ルートコマンド）
+internal/api/             Redmine HTTPクライアント + ドメイン型
+internal/commands/        Cobraコマンドツリー（root, auth, issue, mcp）
+internal/cmdutil/         ファクトリ（依存性注入）、IOStreams
+internal/config/          XDG準拠のJSON設定（~/.config/rmn/config.json）
+```
+
+rmnはCLIフレームワークに[Cobra](https://github.com/spf13/cobra)を、MCPサーバーの実装に[mcp-go](https://github.com/mark3labs/mcp-go)を使用しています。コードベースは依存性注入にファクトリパターンを採用しており、すべてのコマンドをモックHTTPサーバーでテスト可能にしています。
+
+## 開発
+
+```bash
+make build    # バイナリをビルド
+make test     # 全テストを実行
+make vet      # 静的解析
+make lint     # リンター実行（golangci-lintが必要）
+make cover    # カバレッジレポート（100%カバレッジを強制）
+make install  # $GOPATH/binにインストール
+make clean    # ビルド成果物を削除
+```
+
+すべてのプルリクエストはCIを通過する必要があります。CIでは以下が強制されます：
+- `go vet ./...` で警告ゼロ
+- テストカバレッジ100%
+
+## コントリビューション
+
+1. リポジトリをフォーク
+2. フィーチャーブランチを作成（`git checkout -b feature/my-feature`）
+3. 変更を実施
+4. **ドキュメントを更新** -- ユーザー向けの動作に影響する変更の場合（コードとドキュメントの対応表は `CLAUDE.md` を参照）
+5. テストが通ることを確認：`make test && make vet`
+6. コミットしてプッシュ
+7. プルリクエストを作成
+
+既存のコードスタイルに従ってください：サブコマンドごとに1ファイル、`httptest.NewServer` を使ったテーブル駆動テスト、エラーラッピングには `fmt.Errorf("context: %w", err)` を使用。
+
+## ライセンス
+
+このプロジェクトは[MITライセンス](LICENSE)の下で公開されています。

@@ -80,6 +80,21 @@ When modifying code in these directories, update the corresponding documentation
 | `internal/cmdutil/` | `docs/reference/architecture.md` |
 | `Makefile` | `README.md` (Development section), `docs/development.md` |
 
+### Japanese Translation (i18n)
+
+The documentation supports English (default) and Japanese. When updating English docs, also update the corresponding Japanese files:
+
+| English | Japanese |
+|---|---|
+| `README.md` | `README.ja.md` |
+| `docs/<page>.md` | `docs/ja/<page>.md` |
+| `docs/guide/<page>.md` | `docs/ja/guide/<page>.md` |
+| `docs/reference/<page>.md` | `docs/ja/reference/<page>.md` |
+| `docs/public/llms.txt` | `docs/public/llms-ja.txt` |
+| `docs/public/llms-full.txt` | `docs/public/llms-full-ja.txt` |
+
+VitePress i18n is configured in `docs/.vitepress/config.mts` via the `locales` object. The Japanese locale (`ja`) has its own nav, sidebar, and UI labels.
+
 ### When to Update Documentation
 
 **Always update docs when:**
@@ -106,3 +121,5 @@ When docs are needed, update all applicable locations:
 2. `docs/` — the corresponding VitePress page
 3. `docs/public/llms.txt` and `docs/public/llms-full.txt` — if CLI commands or MCP tools changed
 4. `CLAUDE.md` — if the change affects development workflow or conventions
+5. `README.ja.md` and `docs/ja/` — the corresponding Japanese translations
+6. `docs/public/llms-ja.txt` and `docs/public/llms-full-ja.txt` — if the English LLM files were updated
