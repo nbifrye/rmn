@@ -9,6 +9,120 @@ permissions:
   pull-requests: write
 
 jobs:
+  docs-check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check for documentation updates
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const { data: files } = await github.rest.pulls.listFiles({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: context.issue.number,
+              per_page: 300,
+            });
+
+            const changedFiles = files.map(f => f.filename);
+
+            // Files that are documentation
+            const docFiles = changedFiles.filter(f =>
+              f.startsWith('docs/') ||
+              f === 'README.md' ||
+              f === 'CLAUDE.md'
+            );
+
+            // Files that are user-facing Go source (not tests)
+            const userFacingDirs = [
+              'internal/commands/',
+              'internal/api/',
+              'internal/config/',
+              'internal/cmdutil/',
+              'cmd/',
+            ];
+            const userFacingCode = changedFiles.filter(f =>
+              f.endsWith('.go') &&
+              !f.endsWith('_test.go') &&
+              userFacingDirs.some(dir => f.startsWith(dir))
+            );
+
+            const marker = '<!-- docs-reminder -->';
+
+            // Find existing bot comment
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+            });
+            const botComment = comments.find(c =>
+              c.body.includes(marker)
+            );
+
+            if (userFacingCode.length > 0 && docFiles.length === 0) {
+              // Build mapping hints
+              const hints = new Set();
+              for (const f of userFacingCode) {
+                if (f.startsWith('internal/commands/issue/'))
+                  hints.add('`README.md` (Usage), `docs/guide/usage.md`');
+                if (f.startsWith('internal/commands/mcp/'))
+                  hints.add('`README.md` (MCP Server), `docs/mcp-server.md`, `docs/public/llms.txt`');
+                if (f.startsWith('internal/commands/auth/'))
+                  hints.add('`README.md` (Configuration), `docs/guide/configuration.md`');
+                if (f.startsWith('internal/config/'))
+                  hints.add('`README.md` (Configuration), `docs/guide/configuration.md`');
+                if (f.startsWith('internal/api/'))
+                  hints.add('`README.md` (Security), `docs/reference/security.md`');
+                if (f.startsWith('internal/cmdutil/'))
+                  hints.add('`docs/reference/architecture.md`');
+                if (f.startsWith('cmd/'))
+                  hints.add('`README.md` (Architecture), `docs/reference/architecture.md`');
+              }
+
+              const hintList = [...hints].map(h => `- ${h}`).join('\n');
+              const fileList = userFacingCode.map(f => `- \`${f}\``).join('\n');
+
+              const body = [
+                marker,
+                '## :memo: Documentation Reminder',
+                '',
+                'This PR modifies user-facing source files but does not include documentation updates.',
+                'If this change affects CLI behavior, flags, output, or MCP tools, please consider updating:',
+                '',
+                hintList,
+                '',
+                '<details><summary>Changed source files</summary>',
+                '',
+                fileList,
+                '',
+                '</details>',
+                '',
+                '*This is an automated reminder, not a blocking check. Internal refactors and non-behavioral changes do not need doc updates.*',
+              ].join('\n');
+
+              if (botComment) {
+                await github.rest.issues.updateComment({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  comment_id: botComment.id,
+                  body,
+                });
+              } else {
+                await github.rest.issues.createComment({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: context.issue.number,
+                  body,
+                });
+              }
+            } else if (botComment) {
+              // Docs were added or no user-facing code changed — remove stale reminder
+              await github.rest.issues.deleteComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: botComment.id,
+              });
+            }
+
   test:
     runs-on: ubuntu-latest
     steps:

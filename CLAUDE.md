@@ -50,6 +50,9 @@ internal/config/          XDG-compliant JSON config (~/.config/rmn/config.json)
 3. Support `--output json` for machine-readable output
 4. Create `<name>_test.go` with httptest mock server
 5. Add corresponding MCP tool in `internal/commands/mcp/serve.go` with annotations
+6. Add usage examples to `README.md` under the appropriate section
+7. Add usage examples to `docs/guide/usage.md` (or the relevant VitePress page)
+8. Update `docs/public/llms.txt` and `docs/public/llms-full.txt` with the new command
 
 ## MCP Tool Guidelines
 
@@ -58,3 +61,48 @@ internal/config/          XDG-compliant JSON config (~/.config/rmn/config.json)
 - Destructive tools: `WithDestructiveHintAnnotation(true)`, `WithReadOnlyHintAnnotation(false)`
 - Tool descriptions must include: what it does, what it returns, and edge case behavior
 - Do NOT hardcode Redmine-instance-specific IDs in descriptions; note they are configurable
+
+## Documentation
+
+### Code → Documentation Mapping
+
+When modifying code in these directories, update the corresponding documentation:
+
+| Source | Documentation Files |
+|---|---|
+| `internal/commands/issue/` | `README.md` (Usage section), `docs/guide/usage.md` |
+| `internal/commands/mcp/serve.go` | `README.md` (MCP Server section), `docs/mcp-server.md`, `docs/public/llms.txt`, `docs/public/llms-full.txt` |
+| `internal/commands/auth/` | `README.md` (Configuration section), `docs/guide/configuration.md` |
+| `internal/config/` | `README.md` (Configuration section), `docs/guide/configuration.md` |
+| `internal/api/` (security features) | `README.md` (Security section), `docs/reference/security.md` |
+| `internal/commands/root.go` (global flags) | `README.md` (Global Flags section), `docs/guide/usage.md` |
+| `cmd/rmn/` | `README.md` (Architecture section), `docs/reference/architecture.md` |
+| `internal/cmdutil/` | `docs/reference/architecture.md` |
+| `Makefile` | `README.md` (Development section), `docs/development.md` |
+
+### When to Update Documentation
+
+**Always update docs when:**
+- Adding a new CLI command or subcommand
+- Adding or removing command flags
+- Adding or changing MCP tools
+- Changing config file format or location
+- Changing authentication behavior
+- Changing security behavior (TLS, permissions, redirects)
+- Changing installation methods or build requirements
+- Changing command aliases
+
+**No doc update needed for:**
+- Internal refactors that do not change user-facing behavior
+- Test-only changes (new tests, test fixes)
+- CI/workflow changes (unless they affect the Development section)
+- Dependency updates (go.mod/go.sum) without behavior changes
+- Code style or linting fixes
+
+### Documentation Checklist
+
+When docs are needed, update all applicable locations:
+1. `README.md` — the relevant section (keeps README as the canonical reference)
+2. `docs/` — the corresponding VitePress page
+3. `docs/public/llms.txt` and `docs/public/llms-full.txt` — if CLI commands or MCP tools changed
+4. `CLAUDE.md` — if the change affects development workflow or conventions
