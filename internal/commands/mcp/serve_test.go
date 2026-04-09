@@ -10,14 +10,13 @@ import (
 	"os"
 	"testing"
 
-	mcplib "github.com/mark3labs/mcp-go/mcp"
-	"github.com/mark3labs/mcp-go/server"
+	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"github.com/nbifrye/rmn/internal/api"
 	"github.com/nbifrye/rmn/internal/cmdutil"
 	"github.com/nbifrye/rmn/internal/config"
 )
 
-func setupTestServer(t *testing.T) (*server.MCPServer, *httptest.Server) {
+func setupTestServer(t *testing.T) (map[string]mcp.ToolHandler, *httptest.Server) {
 	t.Helper()
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch {
@@ -52,63 +51,55 @@ func setupTestServer(t *testing.T) (*server.MCPServer, *httptest.Server) {
 	}))
 
 	client := api.NewClient(srv.URL, "test-key")
-	mcpServer := server.NewMCPServer("test", "0.1.0")
-	registerTools(mcpServer, client)
+	handlers := map[string]mcp.ToolHandler{
+		"list_issues":  makeListIssuesHandler(client),
+		"get_issue":    makeGetIssueHandler(client),
+		"create_issue": makeCreateIssueHandler(client),
+		"update_issue": makeUpdateIssueHandler(client),
+		"delete_issue": makeDeleteIssueHandler(client),
+	}
 
-	// Initialize the server first
-	initMsg := `{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-03-26","capabilities":{},"clientInfo":{"name":"test","version":"1.0"}}}`
-	mcpServer.HandleMessage(context.Background(), json.RawMessage(initMsg))
-
-	return mcpServer, srv
+	return handlers, srv
 }
 
-func callTool(t *testing.T, s *server.MCPServer, name string, args map[string]interface{}) (string, bool) {
+func callTool(t *testing.T, handlers map[string]mcp.ToolHandler, name string, args map[string]interface{}) (string, bool) {
 	t.Helper()
 
+	handler, ok := handlers[name]
+	if !ok {
+		t.Fatalf("unknown tool: %s", name)
+	}
+
 	argsJSON, _ := json.Marshal(args)
-	msg := fmt.Sprintf(`{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":%q,"arguments":%s}}`, name, string(argsJSON))
+	req := &mcp.CallToolRequest{
+		Params: &mcp.CallToolParamsRaw{
+			Name:      name,
+			Arguments: argsJSON,
+		},
+	}
 
-	resp := s.HandleMessage(context.Background(), json.RawMessage(msg))
-
-	// Parse the response
-	respData, err := json.Marshal(resp)
+	result, err := handler(context.Background(), req)
 	if err != nil {
-		t.Fatalf("marshal response: %v", err)
+		t.Fatalf("handler error: %v", err)
 	}
 
-	var rpcResp struct {
-		Result struct {
-			Content []struct {
-				Type string `json:"type"`
-				Text string `json:"text"`
-			} `json:"content"`
-			IsError bool `json:"isError"`
-		} `json:"result"`
-		Error *struct {
-			Code    int    `json:"code"`
-			Message string `json:"message"`
-		} `json:"error"`
-	}
-	if err := json.Unmarshal(respData, &rpcResp); err != nil {
-		t.Fatalf("unmarshal response: %v\n%s", err, string(respData))
-	}
-
-	if rpcResp.Error != nil {
-		return rpcResp.Error.Message, true
-	}
-
-	if len(rpcResp.Result.Content) == 0 {
+	if len(result.Content) == 0 {
 		t.Fatal("empty result content")
 	}
 
-	return rpcResp.Result.Content[0].Text, rpcResp.Result.IsError
+	tc, ok := result.Content[0].(*mcp.TextContent)
+	if !ok {
+		t.Fatalf("expected TextContent, got %T", result.Content[0])
+	}
+
+	return tc.Text, result.IsError
 }
 
 func TestListIssuesHandler(t *testing.T) {
-	s, srv := setupTestServer(t)
+	handlers, srv := setupTestServer(t)
 	defer srv.Close()
 
-	text, isErr := callTool(t, s, "list_issues", map[string]interface{}{
+	text, isErr := callTool(t, handlers, "list_issues", map[string]interface{}{
 		"project_id": "test",
 	})
 	if isErr {
@@ -128,10 +119,10 @@ func TestListIssuesHandler(t *testing.T) {
 }
 
 func TestGetIssueHandler(t *testing.T) {
-	s, srv := setupTestServer(t)
+	handlers, srv := setupTestServer(t)
 	defer srv.Close()
 
-	text, isErr := callTool(t, s, "get_issue", map[string]interface{}{
+	text, isErr := callTool(t, handlers, "get_issue", map[string]interface{}{
 		"issue_id": 42,
 	})
 	if isErr {
@@ -148,10 +139,10 @@ func TestGetIssueHandler(t *testing.T) {
 }
 
 func TestGetIssueHandler_MissingID(t *testing.T) {
-	s, srv := setupTestServer(t)
+	handlers, srv := setupTestServer(t)
 	defer srv.Close()
 
-	text, isErr := callTool(t, s, "get_issue", map[string]interface{}{})
+	text, isErr := callTool(t, handlers, "get_issue", map[string]interface{}{})
 	if !isErr {
 		t.Error("expected error result")
 	}
@@ -161,10 +152,10 @@ func TestGetIssueHandler_MissingID(t *testing.T) {
 }
 
 func TestCreateIssueHandler(t *testing.T) {
-	s, srv := setupTestServer(t)
+	handlers, srv := setupTestServer(t)
 	defer srv.Close()
 
-	text, isErr := callTool(t, s, "create_issue", map[string]interface{}{
+	text, isErr := callTool(t, handlers, "create_issue", map[string]interface{}{
 		"project_id": "test",
 		"subject":    "New issue",
 	})
@@ -182,11 +173,11 @@ func TestCreateIssueHandler(t *testing.T) {
 }
 
 func TestCreateIssueHandler_MissingRequired(t *testing.T) {
-	s, srv := setupTestServer(t)
+	handlers, srv := setupTestServer(t)
 	defer srv.Close()
 
 	// Missing subject
-	text, isErr := callTool(t, s, "create_issue", map[string]interface{}{
+	text, isErr := callTool(t, handlers, "create_issue", map[string]interface{}{
 		"project_id": "test",
 	})
 	if !isErr {
@@ -194,7 +185,7 @@ func TestCreateIssueHandler_MissingRequired(t *testing.T) {
 	}
 
 	// Missing project_id
-	text, isErr = callTool(t, s, "create_issue", map[string]interface{}{
+	text, isErr = callTool(t, handlers, "create_issue", map[string]interface{}{
 		"subject": "test",
 	})
 	if !isErr {
@@ -203,10 +194,10 @@ func TestCreateIssueHandler_MissingRequired(t *testing.T) {
 }
 
 func TestUpdateIssueHandler(t *testing.T) {
-	s, srv := setupTestServer(t)
+	handlers, srv := setupTestServer(t)
 	defer srv.Close()
 
-	text, isErr := callTool(t, s, "update_issue", map[string]interface{}{
+	text, isErr := callTool(t, handlers, "update_issue", map[string]interface{}{
 		"issue_id": 42,
 		"notes":    "Updated via MCP",
 	})
@@ -227,10 +218,10 @@ func TestUpdateIssueHandler(t *testing.T) {
 }
 
 func TestDeleteIssueHandler(t *testing.T) {
-	s, srv := setupTestServer(t)
+	handlers, srv := setupTestServer(t)
 	defer srv.Close()
 
-	text, isErr := callTool(t, s, "delete_issue", map[string]interface{}{
+	text, isErr := callTool(t, handlers, "delete_issue", map[string]interface{}{
 		"issue_id": 42,
 	})
 	if isErr {
@@ -249,20 +240,20 @@ func TestDeleteIssueHandler(t *testing.T) {
 }
 
 func TestDeleteIssueHandler_MissingID(t *testing.T) {
-	s, srv := setupTestServer(t)
+	handlers, srv := setupTestServer(t)
 	defer srv.Close()
 
-	_, isErr := callTool(t, s, "delete_issue", map[string]interface{}{})
+	_, isErr := callTool(t, handlers, "delete_issue", map[string]interface{}{})
 	if !isErr {
 		t.Error("expected error result")
 	}
 }
 
 func TestGetIssueHandler_NegativeID(t *testing.T) {
-	s, srv := setupTestServer(t)
+	handlers, srv := setupTestServer(t)
 	defer srv.Close()
 
-	text, isErr := callTool(t, s, "get_issue", map[string]interface{}{"issue_id": -1})
+	text, isErr := callTool(t, handlers, "get_issue", map[string]interface{}{"issue_id": -1})
 	if !isErr {
 		t.Error("expected error result for negative issue_id")
 	}
@@ -272,10 +263,10 @@ func TestGetIssueHandler_NegativeID(t *testing.T) {
 }
 
 func TestUpdateIssueHandler_NegativeID(t *testing.T) {
-	s, srv := setupTestServer(t)
+	handlers, srv := setupTestServer(t)
 	defer srv.Close()
 
-	text, isErr := callTool(t, s, "update_issue", map[string]interface{}{"issue_id": -5})
+	text, isErr := callTool(t, handlers, "update_issue", map[string]interface{}{"issue_id": -5})
 	if !isErr {
 		t.Error("expected error result for negative issue_id")
 	}
@@ -285,10 +276,10 @@ func TestUpdateIssueHandler_NegativeID(t *testing.T) {
 }
 
 func TestDeleteIssueHandler_NegativeID(t *testing.T) {
-	s, srv := setupTestServer(t)
+	handlers, srv := setupTestServer(t)
 	defer srv.Close()
 
-	text, isErr := callTool(t, s, "delete_issue", map[string]interface{}{"issue_id": -3})
+	text, isErr := callTool(t, handlers, "delete_issue", map[string]interface{}{"issue_id": -3})
 	if !isErr {
 		t.Error("expected error result for negative issue_id")
 	}
@@ -332,44 +323,10 @@ func TestGetStringPtrArg_NonStringType(t *testing.T) {
 }
 
 func TestToolAnnotations(t *testing.T) {
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusOK)
-	}))
-	defer srv.Close()
-
-	client := api.NewClient(srv.URL, "test-key")
-	mcpServer := server.NewMCPServer("test", "0.1.0")
-	registerTools(mcpServer, client)
-
-	// Initialize the server
-	initMsg := `{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-03-26","capabilities":{},"clientInfo":{"name":"test","version":"1.0"}}}`
-	mcpServer.HandleMessage(context.Background(), json.RawMessage(initMsg))
-
-	// List tools to verify annotations
-	listMsg := `{"jsonrpc":"2.0","id":2,"method":"tools/list"}`
-	resp := mcpServer.HandleMessage(context.Background(), json.RawMessage(listMsg))
-
-	respData, err := json.Marshal(resp)
-	if err != nil {
-		t.Fatalf("marshal response: %v", err)
-	}
-
-	var rpcResp struct {
-		Result struct {
-			Tools []struct {
-				Name        string `json:"name"`
-				Annotations struct {
-					Title           string `json:"title"`
-					ReadOnlyHint    *bool  `json:"readOnlyHint"`
-					DestructiveHint *bool  `json:"destructiveHint"`
-					IdempotentHint  *bool  `json:"idempotentHint"`
-					OpenWorldHint   *bool  `json:"openWorldHint"`
-				} `json:"annotations"`
-			} `json:"tools"`
-		} `json:"result"`
-	}
-	if err := json.Unmarshal(respData, &rpcResp); err != nil {
-		t.Fatalf("unmarshal response: %v\n%s", err, string(respData))
+	tools := toolDefs()
+	toolMap := make(map[string]*mcp.Tool)
+	for _, tool := range tools {
+		toolMap[tool.Name] = tool
 	}
 
 	tests := []struct {
@@ -385,37 +342,25 @@ func TestToolAnnotations(t *testing.T) {
 		{"delete_issue", false, true, true},
 	}
 
-	toolMap := make(map[string]struct {
-		ReadOnlyHint    *bool
-		DestructiveHint *bool
-		IdempotentHint  *bool
-	})
-	for _, tool := range rpcResp.Result.Tools {
-		toolMap[tool.Name] = struct {
-			ReadOnlyHint    *bool
-			DestructiveHint *bool
-			IdempotentHint  *bool
-		}{
-			ReadOnlyHint:    tool.Annotations.ReadOnlyHint,
-			DestructiveHint: tool.Annotations.DestructiveHint,
-			IdempotentHint:  tool.Annotations.IdempotentHint,
-		}
-	}
-
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			tool, ok := toolMap[tc.name]
 			if !ok {
 				t.Fatalf("tool %q not found in registered tools", tc.name)
 			}
-			if tool.ReadOnlyHint == nil || *tool.ReadOnlyHint != tc.wantReadOnly {
-				t.Errorf("readOnlyHint: got %v, want %v", tool.ReadOnlyHint, tc.wantReadOnly)
+			if tool.Annotations == nil {
+				t.Fatal("annotations are nil")
 			}
-			if tool.DestructiveHint == nil || *tool.DestructiveHint != tc.wantDestructive {
-				t.Errorf("destructiveHint: got %v, want %v", tool.DestructiveHint, tc.wantDestructive)
+			if tool.Annotations.ReadOnlyHint != tc.wantReadOnly {
+				t.Errorf("readOnlyHint: got %v, want %v", tool.Annotations.ReadOnlyHint, tc.wantReadOnly)
 			}
-			if tool.IdempotentHint == nil || *tool.IdempotentHint != tc.wantIdempotent {
-				t.Errorf("idempotentHint: got %v, want %v", tool.IdempotentHint, tc.wantIdempotent)
+			if tool.Annotations.DestructiveHint == nil {
+				t.Errorf("destructiveHint: got nil, want %v", tc.wantDestructive)
+			} else if *tool.Annotations.DestructiveHint != tc.wantDestructive {
+				t.Errorf("destructiveHint: got %v, want %v", *tool.Annotations.DestructiveHint, tc.wantDestructive)
+			}
+			if tool.Annotations.IdempotentHint != tc.wantIdempotent {
+				t.Errorf("idempotentHint: got %v, want %v", tool.Annotations.IdempotentHint, tc.wantIdempotent)
 			}
 		})
 	}
@@ -454,9 +399,8 @@ func TestNewCmdMcp(t *testing.T) {
 	}
 }
 
-func TestServeStdioFunc_Default(t *testing.T) {
-	// Verify the default serveStdioFunc calls server.ServeStdio.
-	// Provide an immediately-closed stdin so ServeStdio returns on EOF.
+func TestRunServerFunc_Default(t *testing.T) {
+	// Provide an immediately-closed stdin so the server returns on EOF.
 	r, w, err := os.Pipe()
 	if err != nil {
 		t.Fatalf("creating pipe: %v", err)
@@ -467,8 +411,8 @@ func TestServeStdioFunc_Default(t *testing.T) {
 	os.Stdin = r
 	defer func() { os.Stdin = origStdin }()
 
-	s := server.NewMCPServer("test", "0.1.0")
-	if err := serveStdioFunc(s); err != nil {
+	s := mcp.NewServer(&mcp.Implementation{Name: "test", Version: "0.1.0"}, nil)
+	if err := runServerFunc(context.Background(), s); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 }
@@ -491,10 +435,10 @@ func TestNewCmdServe_Success(t *testing.T) {
 		},
 	}
 
-	// Replace serveStdioFunc to avoid blocking on stdin
-	origServe := serveStdioFunc
-	serveStdioFunc = func(s *server.MCPServer) error { return nil }
-	defer func() { serveStdioFunc = origServe }()
+	// Replace runServerFunc to avoid blocking on stdin
+	origServe := runServerFunc
+	runServerFunc = func(ctx context.Context, s *mcp.Server) error { return nil }
+	defer func() { runServerFunc = origServe }()
 
 	cmd := newCmdServe(f, "test")
 	err := cmd.Execute()
@@ -529,8 +473,11 @@ func TestNewCmdServe_APIClientError(t *testing.T) {
 }
 
 func TestGetArgs_NonMap(t *testing.T) {
-	req := mcplib.CallToolRequest{}
-	req.Params.Arguments = "not a map"
+	req := &mcp.CallToolRequest{
+		Params: &mcp.CallToolParamsRaw{
+			Arguments: json.RawMessage(`"not a map"`),
+		},
+	}
 	args := getArgs(req)
 	if len(args) != 0 {
 		t.Errorf("expected empty map for non-map arguments, got %v", args)
@@ -538,8 +485,11 @@ func TestGetArgs_NonMap(t *testing.T) {
 }
 
 func TestGetArgs_NilArguments(t *testing.T) {
-	req := mcplib.CallToolRequest{}
-	req.Params.Arguments = nil
+	req := &mcp.CallToolRequest{
+		Params: &mcp.CallToolParamsRaw{
+			Arguments: nil,
+		},
+	}
 	args := getArgs(req)
 	if len(args) != 0 {
 		t.Errorf("expected empty map for nil arguments, got %v", args)
@@ -686,9 +636,9 @@ func TestToJSON_Error(t *testing.T) {
 	}
 }
 
-// setupErrorServer creates an MCP server backed by an HTTP server that always
+// setupErrorServer creates handlers backed by an HTTP server that always
 // returns the given status code and response body, for testing API error handling.
-func setupErrorServer(t *testing.T, statusCode int, body string) (*server.MCPServer, *httptest.Server) {
+func setupErrorServer(t *testing.T, statusCode int, body string) (map[string]mcp.ToolHandler, *httptest.Server) {
 	t.Helper()
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(statusCode)
@@ -696,40 +646,42 @@ func setupErrorServer(t *testing.T, statusCode int, body string) (*server.MCPSer
 	}))
 
 	client := api.NewClient(srv.URL, "test-key")
-	mcpServer := server.NewMCPServer("test", "0.1.0")
-	registerTools(mcpServer, client)
+	handlers := map[string]mcp.ToolHandler{
+		"list_issues":  makeListIssuesHandler(client),
+		"get_issue":    makeGetIssueHandler(client),
+		"create_issue": makeCreateIssueHandler(client),
+		"update_issue": makeUpdateIssueHandler(client),
+		"delete_issue": makeDeleteIssueHandler(client),
+	}
 
-	initMsg := `{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-03-26","capabilities":{},"clientInfo":{"name":"test","version":"1.0"}}}`
-	mcpServer.HandleMessage(context.Background(), json.RawMessage(initMsg))
-
-	return mcpServer, srv
+	return handlers, srv
 }
 
 func TestListIssuesHandler_APIError(t *testing.T) {
-	s, srv := setupErrorServer(t, http.StatusInternalServerError, `{"errors":["Server error"]}`)
+	handlers, srv := setupErrorServer(t, http.StatusInternalServerError, `{"errors":["Server error"]}`)
 	defer srv.Close()
 
-	text, isErr := callTool(t, s, "list_issues", map[string]interface{}{})
+	text, isErr := callTool(t, handlers, "list_issues", map[string]interface{}{})
 	if !isErr {
 		t.Errorf("expected error result, got: %s", text)
 	}
 }
 
 func TestGetIssueHandler_APIError(t *testing.T) {
-	s, srv := setupErrorServer(t, http.StatusNotFound, `{"errors":["Not found"]}`)
+	handlers, srv := setupErrorServer(t, http.StatusNotFound, `{"errors":["Not found"]}`)
 	defer srv.Close()
 
-	text, isErr := callTool(t, s, "get_issue", map[string]interface{}{"issue_id": 999})
+	text, isErr := callTool(t, handlers, "get_issue", map[string]interface{}{"issue_id": 999})
 	if !isErr {
 		t.Errorf("expected error result, got: %s", text)
 	}
 }
 
 func TestCreateIssueHandler_APIError(t *testing.T) {
-	s, srv := setupErrorServer(t, http.StatusUnprocessableEntity, `{"errors":["Subject cannot be blank"]}`)
+	handlers, srv := setupErrorServer(t, http.StatusUnprocessableEntity, `{"errors":["Subject cannot be blank"]}`)
 	defer srv.Close()
 
-	text, isErr := callTool(t, s, "create_issue", map[string]interface{}{
+	text, isErr := callTool(t, handlers, "create_issue", map[string]interface{}{
 		"project_id": "test",
 		"subject":    "test",
 	})
@@ -739,10 +691,10 @@ func TestCreateIssueHandler_APIError(t *testing.T) {
 }
 
 func TestCreateIssueHandler_NumericProjectID(t *testing.T) {
-	s, srv := setupTestServer(t)
+	handlers, srv := setupTestServer(t)
 	defer srv.Close()
 
-	text, isErr := callTool(t, s, "create_issue", map[string]interface{}{
+	text, isErr := callTool(t, handlers, "create_issue", map[string]interface{}{
 		"project_id": "1",
 		"subject":    "Numeric project",
 	})
@@ -752,10 +704,10 @@ func TestCreateIssueHandler_NumericProjectID(t *testing.T) {
 }
 
 func TestUpdateIssueHandler_MissingID(t *testing.T) {
-	s, srv := setupTestServer(t)
+	handlers, srv := setupTestServer(t)
 	defer srv.Close()
 
-	text, isErr := callTool(t, s, "update_issue", map[string]interface{}{})
+	text, isErr := callTool(t, handlers, "update_issue", map[string]interface{}{})
 	if !isErr {
 		t.Errorf("expected error result, got: %s", text)
 	}
@@ -765,10 +717,10 @@ func TestUpdateIssueHandler_MissingID(t *testing.T) {
 }
 
 func TestUpdateIssueHandler_APIError(t *testing.T) {
-	s, srv := setupErrorServer(t, http.StatusNotFound, `{"errors":["Not found"]}`)
+	handlers, srv := setupErrorServer(t, http.StatusNotFound, `{"errors":["Not found"]}`)
 	defer srv.Close()
 
-	text, isErr := callTool(t, s, "update_issue", map[string]interface{}{
+	text, isErr := callTool(t, handlers, "update_issue", map[string]interface{}{
 		"issue_id": 42,
 		"notes":    "test",
 	})
@@ -778,10 +730,10 @@ func TestUpdateIssueHandler_APIError(t *testing.T) {
 }
 
 func TestDeleteIssueHandler_APIError(t *testing.T) {
-	s, srv := setupErrorServer(t, http.StatusNotFound, `{"errors":["Not found"]}`)
+	handlers, srv := setupErrorServer(t, http.StatusNotFound, `{"errors":["Not found"]}`)
 	defer srv.Close()
 
-	text, isErr := callTool(t, s, "delete_issue", map[string]interface{}{
+	text, isErr := callTool(t, handlers, "delete_issue", map[string]interface{}{
 		"issue_id": 999,
 	})
 	if !isErr {
@@ -790,10 +742,10 @@ func TestDeleteIssueHandler_APIError(t *testing.T) {
 }
 
 func TestUpdateIssueHandler_WithAllFields(t *testing.T) {
-	s, srv := setupTestServer(t)
+	handlers, srv := setupTestServer(t)
 	defer srv.Close()
 
-	text, isErr := callTool(t, s, "update_issue", map[string]interface{}{
+	text, isErr := callTool(t, handlers, "update_issue", map[string]interface{}{
 		"issue_id":       42,
 		"subject":        "Updated subject",
 		"description":    "New description",
@@ -808,10 +760,10 @@ func TestUpdateIssueHandler_WithAllFields(t *testing.T) {
 }
 
 func TestCreateIssueHandler_WithAllFields(t *testing.T) {
-	s, srv := setupTestServer(t)
+	handlers, srv := setupTestServer(t)
 	defer srv.Close()
 
-	text, isErr := callTool(t, s, "create_issue", map[string]interface{}{
+	text, isErr := callTool(t, handlers, "create_issue", map[string]interface{}{
 		"project_id":     "test",
 		"subject":        "Full issue",
 		"description":    "Desc",
@@ -829,7 +781,8 @@ func TestGetIssueHandler_WithInclude(t *testing.T) {
 		if r.URL.Path == "/issues/42.json" && r.Method == http.MethodGet {
 			include := r.URL.Query().Get("include")
 			if include != "journals,attachments" {
-				t.Errorf("expected include=journals,attachments, got %s", include)
+				w.WriteHeader(http.StatusBadRequest)
+				return
 			}
 			json.NewEncoder(w).Encode(map[string]interface{}{
 				"issue": map[string]interface{}{
@@ -847,23 +800,35 @@ func TestGetIssueHandler_WithInclude(t *testing.T) {
 	defer srv.Close()
 
 	client := api.NewClient(srv.URL, "test-key")
-	mcpServer := server.NewMCPServer("test", "0.1.0")
-	registerTools(mcpServer, client)
+	handler := makeGetIssueHandler(client)
 
-	initMsg := `{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-03-26","capabilities":{},"clientInfo":{"name":"test","version":"1.0"}}}`
-	mcpServer.HandleMessage(context.Background(), json.RawMessage(initMsg))
-
-	text, isErr := callTool(t, mcpServer, "get_issue", map[string]interface{}{
+	argsJSON, _ := json.Marshal(map[string]interface{}{
 		"issue_id": 42,
 		"include":  "journals,attachments",
 	})
-	if isErr {
-		t.Fatalf("unexpected error: %s", text)
+	req := &mcp.CallToolRequest{
+		Params: &mcp.CallToolParamsRaw{
+			Name:      "get_issue",
+			Arguments: argsJSON,
+		},
+	}
+
+	result, err := handler(context.Background(), req)
+	if err != nil {
+		t.Fatalf("handler error: %v", err)
+	}
+
+	tc, ok := result.Content[0].(*mcp.TextContent)
+	if !ok {
+		t.Fatal("expected TextContent")
+	}
+	if result.IsError {
+		t.Fatalf("unexpected error: %s", tc.Text)
 	}
 
 	var issue api.Issue
-	if err := json.Unmarshal([]byte(text), &issue); err != nil {
-		t.Fatalf("invalid JSON: %v\n%s", err, text)
+	if err := json.Unmarshal([]byte(tc.Text), &issue); err != nil {
+		t.Fatalf("invalid JSON: %v\n%s", err, tc.Text)
 	}
 	if len(issue.Journals) != 1 {
 		t.Errorf("expected 1 journal, got %d", len(issue.Journals))
@@ -871,16 +836,16 @@ func TestGetIssueHandler_WithInclude(t *testing.T) {
 }
 
 func TestListIssuesHandler_WithAllParams(t *testing.T) {
-	s, srv := setupTestServer(t)
+	handlers, srv := setupTestServer(t)
 	defer srv.Close()
 
-	text, isErr := callTool(t, s, "list_issues", map[string]interface{}{
-		"project_id":      "test",
-		"status_id":       "open",
-		"assigned_to_id":  "me",
-		"tracker_id":      1,
-		"limit":           10,
-		"offset":          5,
+	text, isErr := callTool(t, handlers, "list_issues", map[string]interface{}{
+		"project_id":     "test",
+		"status_id":      "open",
+		"assigned_to_id": "me",
+		"tracker_id":     1,
+		"limit":          10,
+		"offset":         5,
 	})
 	if isErr {
 		t.Fatalf("unexpected error: %s", text)
@@ -888,42 +853,42 @@ func TestListIssuesHandler_WithAllParams(t *testing.T) {
 }
 
 func TestListIssuesHandler_MarshalError(t *testing.T) {
-	s, srv := setupTestServer(t)
+	handlers, srv := setupTestServer(t)
 	defer srv.Close()
 
 	origToJSON := toJSON
 	toJSON = func(v interface{}) (string, error) { return "", fmt.Errorf("marshal error") }
 	defer func() { toJSON = origToJSON }()
 
-	text, isErr := callTool(t, s, "list_issues", map[string]interface{}{})
+	text, isErr := callTool(t, handlers, "list_issues", map[string]interface{}{})
 	if !isErr {
 		t.Errorf("expected error result, got: %s", text)
 	}
 }
 
 func TestGetIssueHandler_MarshalError(t *testing.T) {
-	s, srv := setupTestServer(t)
+	handlers, srv := setupTestServer(t)
 	defer srv.Close()
 
 	origToJSON := toJSON
 	toJSON = func(v interface{}) (string, error) { return "", fmt.Errorf("marshal error") }
 	defer func() { toJSON = origToJSON }()
 
-	text, isErr := callTool(t, s, "get_issue", map[string]interface{}{"issue_id": 42})
+	text, isErr := callTool(t, handlers, "get_issue", map[string]interface{}{"issue_id": 42})
 	if !isErr {
 		t.Errorf("expected error result, got: %s", text)
 	}
 }
 
 func TestCreateIssueHandler_MarshalError(t *testing.T) {
-	s, srv := setupTestServer(t)
+	handlers, srv := setupTestServer(t)
 	defer srv.Close()
 
 	origToJSON := toJSON
 	toJSON = func(v interface{}) (string, error) { return "", fmt.Errorf("marshal error") }
 	defer func() { toJSON = origToJSON }()
 
-	text, isErr := callTool(t, s, "create_issue", map[string]interface{}{
+	text, isErr := callTool(t, handlers, "create_issue", map[string]interface{}{
 		"project_id": "test",
 		"subject":    "test",
 	})
@@ -933,14 +898,14 @@ func TestCreateIssueHandler_MarshalError(t *testing.T) {
 }
 
 func TestUpdateIssueHandler_MarshalError(t *testing.T) {
-	s, srv := setupTestServer(t)
+	handlers, srv := setupTestServer(t)
 	defer srv.Close()
 
 	origToJSON := toJSON
 	toJSON = func(v interface{}) (string, error) { return "", fmt.Errorf("marshal error") }
 	defer func() { toJSON = origToJSON }()
 
-	text, isErr := callTool(t, s, "update_issue", map[string]interface{}{
+	text, isErr := callTool(t, handlers, "update_issue", map[string]interface{}{
 		"issue_id": 42,
 		"notes":    "test",
 	})
@@ -950,18 +915,15 @@ func TestUpdateIssueHandler_MarshalError(t *testing.T) {
 }
 
 func TestDeleteIssueHandler_MarshalError(t *testing.T) {
-	s, srv := setupTestServer(t)
+	handlers, srv := setupTestServer(t)
 	defer srv.Close()
 
 	origToJSON := toJSON
 	toJSON = func(v interface{}) (string, error) { return "", fmt.Errorf("marshal error") }
 	defer func() { toJSON = origToJSON }()
 
-	text, isErr := callTool(t, s, "delete_issue", map[string]interface{}{"issue_id": 42})
+	text, isErr := callTool(t, handlers, "delete_issue", map[string]interface{}{"issue_id": 42})
 	if !isErr {
 		t.Errorf("expected error result, got: %s", text)
 	}
 }
-
-// Ensure unused import doesn't fail build
-var _ = mcplib.MethodToolsCall
