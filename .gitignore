@@ -24,3 +24,8 @@ result
 # Test coverage
 coverage.out
 coverage-func.txt
+
+# VitePress
+docs/node_modules/
+docs/.vitepress/dist/
+docs/.vitepress/cache/
