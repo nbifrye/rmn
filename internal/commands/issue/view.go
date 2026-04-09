@@ -26,7 +26,7 @@ func NewCmdView(f *cmdutil.Factory) *cobra.Command {
 				return err
 			}
 
-			issue, err := client.GetIssue(cmd.Context(), id)
+			issue, err := client.GetIssue(cmd.Context(), id, nil)
 			if err != nil {
 				return err
 			}
@@ -55,9 +55,30 @@ func NewCmdView(f *cmdutil.Factory) *cobra.Command {
 			fmt.Fprintf(f.IO.Out, "Priority:    %s\n", issue.Priority.Name)
 			fmt.Fprintf(f.IO.Out, "Author:      %s\n", issue.Author.Name)
 			fmt.Fprintf(f.IO.Out, "Assignee:    %s\n", assignee)
+			if issue.Category != nil {
+				fmt.Fprintf(f.IO.Out, "Category:    %s\n", issue.Category.Name)
+			}
+			if issue.FixedVersion != nil {
+				fmt.Fprintf(f.IO.Out, "Version:     %s\n", issue.FixedVersion.Name)
+			}
+			if issue.Parent != nil {
+				fmt.Fprintf(f.IO.Out, "Parent:      #%d\n", issue.Parent.ID)
+			}
+			if issue.StartDate != nil {
+				fmt.Fprintf(f.IO.Out, "Start:       %s\n", *issue.StartDate)
+			}
+			if issue.DueDate != nil {
+				fmt.Fprintf(f.IO.Out, "Due:         %s\n", *issue.DueDate)
+			}
+			if issue.EstimatedHours != nil {
+				fmt.Fprintf(f.IO.Out, "Estimated:   %.2fh\n", *issue.EstimatedHours)
+			}
 			fmt.Fprintf(f.IO.Out, "Done:        %d%%\n", issue.DoneRatio)
 			fmt.Fprintf(f.IO.Out, "Created:     %s\n", issue.CreatedOn)
 			fmt.Fprintf(f.IO.Out, "Updated:     %s\n", issue.UpdatedOn)
+			if issue.ClosedOn != nil {
+				fmt.Fprintf(f.IO.Out, "Closed:      %s\n", *issue.ClosedOn)
+			}
 			if issue.Description != "" {
 				fmt.Fprintf(f.IO.Out, "\n%s\n", issue.Description)
 			}

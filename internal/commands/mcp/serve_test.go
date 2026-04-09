@@ -612,6 +612,72 @@ func TestGetIntPtrArg_AllTypes(t *testing.T) {
 	}
 }
 
+func TestGetFloat64Arg_AllTypes(t *testing.T) {
+	args := map[string]interface{}{
+		"float":          42.5,
+		"int":            int(10),
+		"string":         "3.14",
+		"invalid_string": "abc",
+		"nil_val":        nil,
+		"bool":           true,
+	}
+
+	if v := getFloat64Arg(args, "float"); v != 42.5 {
+		t.Errorf("float: expected 42.5, got %f", v)
+	}
+	if v := getFloat64Arg(args, "int"); v != 10.0 {
+		t.Errorf("int: expected 10.0, got %f", v)
+	}
+	if v := getFloat64Arg(args, "string"); v != 3.14 {
+		t.Errorf("string: expected 3.14, got %f", v)
+	}
+	if v := getFloat64Arg(args, "invalid_string"); v != 0 {
+		t.Errorf("invalid_string: expected 0, got %f", v)
+	}
+	if v := getFloat64Arg(args, "nil_val"); v != 0 {
+		t.Errorf("nil_val: expected 0, got %f", v)
+	}
+	if v := getFloat64Arg(args, "missing"); v != 0 {
+		t.Errorf("missing: expected 0, got %f", v)
+	}
+	if v := getFloat64Arg(args, "bool"); v != 0 {
+		t.Errorf("bool: expected 0, got %f", v)
+	}
+}
+
+func TestGetFloat64PtrArg_AllTypes(t *testing.T) {
+	args := map[string]interface{}{
+		"float":          42.5,
+		"int":            int(10),
+		"string":         "3.14",
+		"invalid_string": "abc",
+		"nil_val":        nil,
+		"bool":           true,
+	}
+
+	if v := getFloat64PtrArg(args, "float"); v == nil || *v != 42.5 {
+		t.Errorf("float: expected *42.5, got %v", v)
+	}
+	if v := getFloat64PtrArg(args, "int"); v == nil || *v != 10.0 {
+		t.Errorf("int: expected *10.0, got %v", v)
+	}
+	if v := getFloat64PtrArg(args, "string"); v == nil || *v != 3.14 {
+		t.Errorf("string: expected *3.14, got %v", v)
+	}
+	if v := getFloat64PtrArg(args, "invalid_string"); v != nil {
+		t.Errorf("invalid_string: expected nil, got %v", *v)
+	}
+	if v := getFloat64PtrArg(args, "nil_val"); v != nil {
+		t.Errorf("nil_val: expected nil, got %v", *v)
+	}
+	if v := getFloat64PtrArg(args, "missing"); v != nil {
+		t.Errorf("missing: expected nil, got %v", *v)
+	}
+	if v := getFloat64PtrArg(args, "bool"); v != nil {
+		t.Errorf("bool: expected nil, got %v", *v)
+	}
+}
+
 func TestToJSON_Error(t *testing.T) {
 	// Channels cannot be marshaled to JSON
 	_, err := toJSON(make(chan int))
@@ -755,6 +821,52 @@ func TestCreateIssueHandler_WithAllFields(t *testing.T) {
 	})
 	if isErr {
 		t.Fatalf("unexpected error: %s", text)
+	}
+}
+
+func TestGetIssueHandler_WithInclude(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/issues/42.json" && r.Method == http.MethodGet {
+			include := r.URL.Query().Get("include")
+			if include != "journals,attachments" {
+				t.Errorf("expected include=journals,attachments, got %s", include)
+			}
+			json.NewEncoder(w).Encode(map[string]interface{}{
+				"issue": map[string]interface{}{
+					"id":      42,
+					"subject": "Found issue",
+					"journals": []map[string]interface{}{
+						{"id": 1, "notes": "A comment", "user": map[string]interface{}{"id": 1, "name": "Admin"}},
+					},
+				},
+			})
+			return
+		}
+		w.WriteHeader(http.StatusNotFound)
+	}))
+	defer srv.Close()
+
+	client := api.NewClient(srv.URL, "test-key")
+	mcpServer := server.NewMCPServer("test", "0.1.0")
+	registerTools(mcpServer, client)
+
+	initMsg := `{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-03-26","capabilities":{},"clientInfo":{"name":"test","version":"1.0"}}}`
+	mcpServer.HandleMessage(context.Background(), json.RawMessage(initMsg))
+
+	text, isErr := callTool(t, mcpServer, "get_issue", map[string]interface{}{
+		"issue_id": 42,
+		"include":  "journals,attachments",
+	})
+	if isErr {
+		t.Fatalf("unexpected error: %s", text)
+	}
+
+	var issue api.Issue
+	if err := json.Unmarshal([]byte(text), &issue); err != nil {
+		t.Fatalf("invalid JSON: %v\n%s", err, text)
+	}
+	if len(issue.Journals) != 1 {
+		t.Errorf("expected 1 journal, got %d", len(issue.Journals))
 	}
 }
 

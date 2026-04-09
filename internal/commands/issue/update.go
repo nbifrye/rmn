@@ -10,8 +10,9 @@ import (
 )
 
 func NewCmdUpdate(f *cmdutil.Factory) *cobra.Command {
-	var statusID, trackerID, priorityID, assignedToID int
-	var subject, description, notes string
+	var statusID, trackerID, priorityID, assignedToID, categoryID, versionID, parentID, doneRatio int
+	var estimatedHours float64
+	var subject, description, notes, startDate, dueDate string
 
 	cmd := &cobra.Command{
 		Use:   "update <id>",
@@ -53,6 +54,34 @@ func NewCmdUpdate(f *cmdutil.Factory) *cobra.Command {
 			}
 			if cmd.Flags().Changed("notes") {
 				params.Notes = notes
+				changed = true
+			}
+			if cmd.Flags().Changed("category") {
+				params.CategoryID = api.IntPtr(categoryID)
+				changed = true
+			}
+			if cmd.Flags().Changed("version") {
+				params.FixedVersionID = api.IntPtr(versionID)
+				changed = true
+			}
+			if cmd.Flags().Changed("parent") {
+				params.ParentIssueID = api.IntPtr(parentID)
+				changed = true
+			}
+			if cmd.Flags().Changed("start-date") {
+				params.StartDate = api.StringPtr(startDate)
+				changed = true
+			}
+			if cmd.Flags().Changed("due-date") {
+				params.DueDate = api.StringPtr(dueDate)
+				changed = true
+			}
+			if cmd.Flags().Changed("estimated-hours") {
+				params.EstimatedHours = api.Float64Ptr(estimatedHours)
+				changed = true
+			}
+			if cmd.Flags().Changed("done-ratio") {
+				params.DoneRatio = api.IntPtr(doneRatio)
 				changed = true
 			}
 
@@ -97,6 +126,13 @@ func NewCmdUpdate(f *cmdutil.Factory) *cobra.Command {
 	cmd.Flags().StringVarP(&description, "description", "d", "", "Issue description")
 	cmd.Flags().IntVarP(&assignedToID, "assignee", "a", 0, "Assignee user ID")
 	cmd.Flags().StringVarP(&notes, "notes", "n", "", "Add a note/comment")
+	cmd.Flags().IntVar(&categoryID, "category", 0, "Category ID")
+	cmd.Flags().IntVar(&versionID, "version", 0, "Target version ID")
+	cmd.Flags().IntVar(&parentID, "parent", 0, "Parent issue ID")
+	cmd.Flags().StringVar(&startDate, "start-date", "", "Start date (YYYY-MM-DD)")
+	cmd.Flags().StringVar(&dueDate, "due-date", "", "Due date (YYYY-MM-DD)")
+	cmd.Flags().Float64Var(&estimatedHours, "estimated-hours", 0, "Estimated hours")
+	cmd.Flags().IntVar(&doneRatio, "done-ratio", 0, "Done ratio (0-100)")
 
 	return cmd
 }

@@ -23,3 +23,25 @@ func TestStringPtr(t *testing.T) {
 		t.Errorf("expected %q, got %q", v, *p)
 	}
 }
+
+func TestFloat64Ptr(t *testing.T) {
+	v := 3.14
+	p := Float64Ptr(v)
+	if p == nil {
+		t.Fatal("expected non-nil pointer")
+	}
+	if *p != v {
+		t.Errorf("expected %f, got %f", v, *p)
+	}
+}
+
+func TestBoolPtr(t *testing.T) {
+	v := true
+	p := BoolPtr(v)
+	if p == nil {
+		t.Fatal("expected non-nil pointer")
+	}
+	if *p != v {
+		t.Errorf("expected %v, got %v", v, *p)
+	}
+}

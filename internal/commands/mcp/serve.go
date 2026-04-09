@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"strconv"
+	"strings"
 
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
@@ -64,6 +65,7 @@ func registerTools(s *server.MCPServer, client *api.Client) {
 			mcp.WithString("status_id", mcp.Description("Filter by status: 'open' (default), 'closed', '*' (all), or a numeric status ID")),
 			mcp.WithString("assigned_to_id", mcp.Description("Filter by assignee: 'me' for current user, or a numeric user ID")),
 			mcp.WithNumber("tracker_id", mcp.Description("Filter by tracker ID (values are specific to your Redmine instance)")),
+			mcp.WithString("sort", mcp.Description("Sort by column, e.g. 'updated_on:desc', 'priority:asc'")),
 			mcp.WithNumber("limit", mcp.Description("Max number of results to return (default 25, max 100)")),
 			mcp.WithNumber("offset", mcp.Description("Pagination offset for retrieving subsequent pages")),
 		),
@@ -73,13 +75,14 @@ func registerTools(s *server.MCPServer, client *api.Client) {
 	// get_issue — read-only, idempotent
 	s.AddTool(
 		mcp.NewTool("get_issue",
-			mcp.WithDescription("Get full details of a specific Redmine issue by ID, including project, tracker, status, priority, author, assignee, description, and timestamps."),
+			mcp.WithDescription("Get full details of a specific Redmine issue by ID, including project, tracker, status, priority, author, assignee, description, and timestamps. Use 'include' to fetch associated data like journals (comments) and attachments."),
 			mcp.WithTitleAnnotation("Get Redmine Issue"),
 			mcp.WithReadOnlyHintAnnotation(true),
 			mcp.WithDestructiveHintAnnotation(false),
 			mcp.WithIdempotentHintAnnotation(true),
 			mcp.WithOpenWorldHintAnnotation(true),
 			mcp.WithNumber("issue_id", mcp.Required(), mcp.Description("The numeric issue ID")),
+			mcp.WithString("include", mcp.Description("Comma-separated list of associations to include: journals, attachments, relations, changesets, watchers, children")),
 		),
 		makeGetIssueHandler(client),
 	)
@@ -99,6 +102,13 @@ func registerTools(s *server.MCPServer, client *api.Client) {
 			mcp.WithNumber("tracker_id", mcp.Description("Tracker ID (values are specific to your Redmine instance)")),
 			mcp.WithNumber("priority_id", mcp.Description("Priority ID (values are specific to your Redmine instance)")),
 			mcp.WithNumber("assigned_to_id", mcp.Description("User ID to assign the issue to")),
+			mcp.WithNumber("category_id", mcp.Description("Category ID")),
+			mcp.WithNumber("fixed_version_id", mcp.Description("Target version ID")),
+			mcp.WithNumber("parent_issue_id", mcp.Description("Parent issue ID")),
+			mcp.WithString("start_date", mcp.Description("Start date in YYYY-MM-DD format")),
+			mcp.WithString("due_date", mcp.Description("Due date in YYYY-MM-DD format")),
+			mcp.WithNumber("estimated_hours", mcp.Description("Estimated hours for the issue")),
+			mcp.WithNumber("done_ratio", mcp.Description("Done ratio (0-100)")),
 		),
 		makeCreateIssueHandler(client),
 	)
@@ -118,6 +128,13 @@ func registerTools(s *server.MCPServer, client *api.Client) {
 			mcp.WithNumber("status_id", mcp.Description("New status ID (values are specific to your Redmine instance)")),
 			mcp.WithNumber("priority_id", mcp.Description("New priority ID (values are specific to your Redmine instance)")),
 			mcp.WithNumber("assigned_to_id", mcp.Description("New assignee user ID (set to 0 to unassign)")),
+			mcp.WithNumber("category_id", mcp.Description("New category ID")),
+			mcp.WithNumber("fixed_version_id", mcp.Description("New target version ID")),
+			mcp.WithNumber("parent_issue_id", mcp.Description("New parent issue ID")),
+			mcp.WithString("start_date", mcp.Description("New start date in YYYY-MM-DD format")),
+			mcp.WithString("due_date", mcp.Description("New due date in YYYY-MM-DD format")),
+			mcp.WithNumber("estimated_hours", mcp.Description("New estimated hours")),
+			mcp.WithNumber("done_ratio", mcp.Description("New done ratio (0-100)")),
 			mcp.WithString("notes", mcp.Description("Add a comment/note to the issue")),
 		),
 		makeUpdateIssueHandler(client),
@@ -215,6 +232,46 @@ func getStringPtrArg(args map[string]interface{}, key string) *string {
 	return &s
 }
 
+// getFloat64Arg returns 0 if the key is absent or not a number.
+func getFloat64Arg(args map[string]interface{}, key string) float64 {
+	v, ok := args[key]
+	if !ok || v == nil {
+		return 0
+	}
+	switch n := v.(type) {
+	case float64:
+		return n
+	case int:
+		return float64(n)
+	case string:
+		f, _ := strconv.ParseFloat(n, 64)
+		return f
+	}
+	return 0
+}
+
+// getFloat64PtrArg returns nil if the key is absent, or a pointer to the float64 value.
+func getFloat64PtrArg(args map[string]interface{}, key string) *float64 {
+	v, ok := args[key]
+	if !ok || v == nil {
+		return nil
+	}
+	switch n := v.(type) {
+	case float64:
+		return &n
+	case int:
+		f := float64(n)
+		return &f
+	case string:
+		f, err := strconv.ParseFloat(n, 64)
+		if err != nil {
+			return nil
+		}
+		return &f
+	}
+	return nil
+}
+
 func makeListIssuesHandler(client *api.Client) server.ToolHandlerFunc {
 	return func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 		args := getArgs(req)
@@ -224,6 +281,7 @@ func makeListIssuesHandler(client *api.Client) server.ToolHandlerFunc {
 			StatusID:     getStringArg(args, "status_id"),
 			AssignedToID: getStringArg(args, "assigned_to_id"),
 			TrackerID:    getIntArg(args, "tracker_id"),
+			Sort:         getStringArg(args, "sort"),
 			Limit:        getIntArg(args, "limit"),
 			Offset:       getIntArg(args, "offset"),
 		}
@@ -255,7 +313,12 @@ func makeGetIssueHandler(client *api.Client) server.ToolHandlerFunc {
 			return mcp.NewToolResultError("issue_id must be a positive integer"), nil
 		}
 
-		issue, err := client.GetIssue(ctx, id)
+		var include []string
+		if inc := getStringArg(args, "include"); inc != "" {
+			include = strings.Split(inc, ",")
+		}
+
+		issue, err := client.GetIssue(ctx, id, include)
 		if err != nil {
 			return mcp.NewToolResultError(err.Error()), nil
 		}
@@ -288,12 +351,19 @@ func makeCreateIssueHandler(client *api.Client) server.ToolHandlerFunc {
 		}
 
 		params := api.IssueCreateParams{
-			ProjectID:    parsedProjectID,
-			Subject:      subject,
-			Description:  getStringArg(args, "description"),
-			TrackerID:    getIntArg(args, "tracker_id"),
-			PriorityID:   getIntArg(args, "priority_id"),
-			AssignedToID: getIntArg(args, "assigned_to_id"),
+			ProjectID:      parsedProjectID,
+			Subject:        subject,
+			Description:    getStringArg(args, "description"),
+			TrackerID:      getIntArg(args, "tracker_id"),
+			PriorityID:     getIntArg(args, "priority_id"),
+			AssignedToID:   getIntArg(args, "assigned_to_id"),
+			CategoryID:     getIntArg(args, "category_id"),
+			FixedVersionID: getIntArg(args, "fixed_version_id"),
+			ParentIssueID:  getIntArg(args, "parent_issue_id"),
+			StartDate:      getStringArg(args, "start_date"),
+			DueDate:        getStringArg(args, "due_date"),
+			EstimatedHours: getFloat64Arg(args, "estimated_hours"),
+			DoneRatio:      getIntArg(args, "done_ratio"),
 		}
 
 		issue, err := client.CreateIssue(ctx, params)
@@ -319,12 +389,19 @@ func makeUpdateIssueHandler(client *api.Client) server.ToolHandlerFunc {
 		}
 
 		params := api.IssueUpdateParams{
-			Subject:      getStringPtrArg(args, "subject"),
-			Notes:        getStringArg(args, "notes"),
-			Description:  getStringPtrArg(args, "description"),
-			StatusID:     getIntPtrArg(args, "status_id"),
-			PriorityID:   getIntPtrArg(args, "priority_id"),
-			AssignedToID: getIntPtrArg(args, "assigned_to_id"),
+			Subject:        getStringPtrArg(args, "subject"),
+			Description:    getStringPtrArg(args, "description"),
+			StatusID:       getIntPtrArg(args, "status_id"),
+			PriorityID:     getIntPtrArg(args, "priority_id"),
+			AssignedToID:   getIntPtrArg(args, "assigned_to_id"),
+			CategoryID:     getIntPtrArg(args, "category_id"),
+			FixedVersionID: getIntPtrArg(args, "fixed_version_id"),
+			ParentIssueID:  getIntPtrArg(args, "parent_issue_id"),
+			StartDate:      getStringPtrArg(args, "start_date"),
+			DueDate:        getStringPtrArg(args, "due_date"),
+			EstimatedHours: getFloat64PtrArg(args, "estimated_hours"),
+			DoneRatio:      getIntPtrArg(args, "done_ratio"),
+			Notes:          getStringArg(args, "notes"),
 		}
 
 		if err := client.UpdateIssue(ctx, id, params); err != nil {

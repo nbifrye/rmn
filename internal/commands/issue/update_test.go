@@ -206,6 +206,56 @@ func TestUpdateCommand_JSONOutput(t *testing.T) {
 	}
 }
 
+func TestUpdateCommand_ExtendedFlags(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var body struct {
+			Issue map[string]interface{} `json:"issue"`
+		}
+		json.NewDecoder(r.Body).Decode(&body)
+		if body.Issue["start_date"] != "2024-06-01" {
+			t.Errorf("expected start_date '2024-06-01', got %v", body.Issue["start_date"])
+		}
+		if body.Issue["due_date"] != "2024-12-31" {
+			t.Errorf("expected due_date '2024-12-31', got %v", body.Issue["due_date"])
+		}
+		if body.Issue["estimated_hours"] != float64(16) {
+			t.Errorf("expected estimated_hours 16, got %v", body.Issue["estimated_hours"])
+		}
+		if body.Issue["done_ratio"] != float64(75) {
+			t.Errorf("expected done_ratio 75, got %v", body.Issue["done_ratio"])
+		}
+		if body.Issue["category_id"] != float64(5) {
+			t.Errorf("expected category_id 5, got %v", body.Issue["category_id"])
+		}
+		if body.Issue["fixed_version_id"] != float64(2) {
+			t.Errorf("expected fixed_version_id 2, got %v", body.Issue["fixed_version_id"])
+		}
+		if body.Issue["parent_issue_id"] != float64(20) {
+			t.Errorf("expected parent_issue_id 20, got %v", body.Issue["parent_issue_id"])
+		}
+		w.WriteHeader(http.StatusNoContent)
+	}))
+	defer srv.Close()
+
+	f := newTestFactory(srv)
+	cmd := NewCmdUpdate(f)
+	setupRootFlags(cmd, "table")
+	cmd.SetArgs([]string{"42",
+		"--start-date", "2024-06-01",
+		"--due-date", "2024-12-31",
+		"--estimated-hours", "16",
+		"--done-ratio", "75",
+		"--category", "5",
+		"--version", "2",
+		"--parent", "20",
+	})
+
+	err := cmd.Execute()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
 func TestUpdateCommand_SubjectOnly(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		var body struct {

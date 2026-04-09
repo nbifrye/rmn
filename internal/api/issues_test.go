@@ -66,7 +66,7 @@ func TestGetIssue(t *testing.T) {
 	defer srv.Close()
 
 	c := NewClient(srv.URL, "key")
-	issue, err := c.GetIssue(context.Background(), 42)
+	issue, err := c.GetIssue(context.Background(), 42, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -75,6 +75,50 @@ func TestGetIssue(t *testing.T) {
 	}
 	if issue.Subject != "Found issue" {
 		t.Errorf("unexpected subject: %s", issue.Subject)
+	}
+}
+
+func TestGetIssue_WithInclude(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/issues/42.json" {
+			t.Errorf("unexpected path: %s", r.URL.Path)
+		}
+		include := r.URL.Query().Get("include")
+		if include != "journals,attachments" {
+			t.Errorf("expected include=journals,attachments, got %s", include)
+		}
+		resp := issueResponse{
+			Issue: Issue{
+				ID:      42,
+				Subject: "Found issue",
+				Journals: []Journal{
+					{ID: 1, User: IdName{ID: 1, Name: "Admin"}, Notes: "Test note", CreatedOn: "2024-01-01T00:00:00Z"},
+				},
+				Attachments: []Attachment{
+					{ID: 10, Filename: "test.txt", Filesize: 1024, Author: IdName{ID: 1, Name: "Admin"}},
+				},
+			},
+		}
+		json.NewEncoder(w).Encode(resp)
+	}))
+	defer srv.Close()
+
+	c := NewClient(srv.URL, "key")
+	issue, err := c.GetIssue(context.Background(), 42, []string{"journals", "attachments"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(issue.Journals) != 1 {
+		t.Errorf("expected 1 journal, got %d", len(issue.Journals))
+	}
+	if issue.Journals[0].Notes != "Test note" {
+		t.Errorf("unexpected journal notes: %s", issue.Journals[0].Notes)
+	}
+	if len(issue.Attachments) != 1 {
+		t.Errorf("expected 1 attachment, got %d", len(issue.Attachments))
+	}
+	if issue.Attachments[0].Filename != "test.txt" {
+		t.Errorf("unexpected attachment filename: %s", issue.Attachments[0].Filename)
 	}
 }
 
@@ -205,6 +249,25 @@ func TestListIssues_AllParams(t *testing.T) {
 	}
 }
 
+func TestListIssues_WithSort(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Query().Get("sort") != "updated_on:desc" {
+			t.Errorf("expected sort=updated_on:desc, got %s", r.URL.Query().Get("sort"))
+		}
+		resp := issuesResponse{Issues: []Issue{}, TotalCount: 0}
+		json.NewEncoder(w).Encode(resp)
+	}))
+	defer srv.Close()
+
+	c := NewClient(srv.URL, "key")
+	_, _, err := c.ListIssues(context.Background(), IssueListParams{
+		Sort: "updated_on:desc",
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
 func TestListIssues_Error(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusInternalServerError)
@@ -227,7 +290,7 @@ func TestGetIssue_Error(t *testing.T) {
 	defer srv.Close()
 
 	c := NewClient(srv.URL, "key")
-	_, err := c.GetIssue(context.Background(), 999)
+	_, err := c.GetIssue(context.Background(), 999, nil)
 	if err == nil {
 		t.Fatal("expected error for not found")
 	}

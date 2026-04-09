@@ -11,7 +11,7 @@ import (
 
 func NewCmdList(f *cmdutil.Factory) *cobra.Command {
 	var trackerID, limit, offset int
-	var projectID, statusID, assignedToID string
+	var projectID, statusID, assignedToID, sort string
 
 	cmd := &cobra.Command{
 		Use:     "list",
@@ -29,6 +29,7 @@ func NewCmdList(f *cmdutil.Factory) *cobra.Command {
 				StatusID:     statusID,
 				AssignedToID: assignedToID,
 				TrackerID:    trackerID,
+				Sort:         sort,
 				Limit:        limit,
 				Offset:       offset,
 			}
@@ -86,6 +87,7 @@ func NewCmdList(f *cmdutil.Factory) *cobra.Command {
 	cmd.Flags().StringVarP(&statusID, "status", "s", "", "Filter by status (open, closed, * for all, or status ID)")
 	cmd.Flags().StringVarP(&assignedToID, "assignee", "a", "", "Filter by assignee (me or user ID)")
 	cmd.Flags().IntVarP(&trackerID, "tracker", "t", 0, "Filter by tracker ID")
+	cmd.Flags().StringVar(&sort, "sort", "", "Sort by column (e.g. updated_on:desc, priority:asc)")
 	cmd.Flags().IntVarP(&limit, "limit", "l", 25, "Number of issues to return")
 	cmd.Flags().IntVar(&offset, "offset", 0, "Offset for pagination")
 
