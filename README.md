@@ -5,6 +5,8 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://github.com/nbifrye/rmn/blob/main/LICENSE)
 [![Docs](https://img.shields.io/badge/docs-GitHub%20Pages-blue)](https://nbifrye.github.io/rmn/)
 
+**[日本語版 README はこちら](README.ja.md)**
+
 **rmn** is an unofficial command-line client for [Redmine](https://www.redmine.org/) written in Go. It provides a fast, intuitive interface for managing Redmine issues directly from your terminal. Inspired by [GitLab CLI (glab)](https://gitlab.com/gitlab-org/cli), rmn brings familiar command patterns to the Redmine ecosystem.
 
 rmn also includes a built-in [Model Context Protocol (MCP)](https://modelcontextprotocol.io/) server, enabling AI agents such as Claude Code to interact with your Redmine instance through natural language. Whether you prefer the keyboard or an AI assistant, rmn gives you full control over Redmine issue management via the Redmine REST API.
