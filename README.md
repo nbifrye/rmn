@@ -1,7 +1,6 @@
 # rmn
 
 [![CI](https://github.com/nbifrye/rmn/actions/workflows/ci.yml/badge.svg)](https://github.com/nbifrye/rmn/actions/workflows/ci.yml)
-[![Go Reference](https://pkg.go.dev/badge/github.com/nbifrye/rmn.svg)](https://pkg.go.dev/github.com/nbifrye/rmn)
 [![Go Version](https://img.shields.io/github/go-mod/go-version/nbifrye/rmn)](https://github.com/nbifrye/rmn/blob/main/go.mod)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://github.com/nbifrye/rmn/blob/main/LICENSE)
 
