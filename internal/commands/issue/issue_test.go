@@ -247,3 +247,11 @@ func TestMarshalJSON_Default(t *testing.T) {
 		t.Errorf("unexpected JSON output: %s", string(data))
 	}
 }
+
+func TestMarshalJSON_RealError(t *testing.T) {
+	// Channels cannot be marshaled to JSON — exercises the real error path
+	_, err := marshalJSON(make(chan int))
+	if err == nil {
+		t.Fatal("expected error for unmarshalable value")
+	}
+}

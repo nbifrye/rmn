@@ -202,6 +202,69 @@ func TestViewCommand_MissingArgs(t *testing.T) {
 	}
 }
 
+func TestViewCommand_AllFields(t *testing.T) {
+	startDate := "2024-01-15"
+	dueDate := "2024-02-15"
+	estHours := 8.5
+	closedOn := "2024-03-01T00:00:00Z"
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		resp := struct {
+			Issue api.Issue `json:"issue"`
+		}{
+			Issue: api.Issue{
+				ID:             42,
+				Subject:        "Full issue",
+				Project:        api.IdName{ID: 1, Name: "My Project"},
+				Tracker:        api.IdName{ID: 1, Name: "Bug"},
+				Status:         api.IdName{ID: 5, Name: "Closed"},
+				Priority:       api.IdName{ID: 2, Name: "Normal"},
+				Author:         api.IdName{ID: 1, Name: "Admin"},
+				AssignedTo:     &api.IdName{ID: 2, Name: "Developer"},
+				Category:       &api.IdName{ID: 3, Name: "Backend"},
+				FixedVersion:   &api.IdName{ID: 1, Name: "v1.0"},
+				Parent:         &api.IssueParent{ID: 10},
+				StartDate:      &startDate,
+				DueDate:        &dueDate,
+				EstimatedHours: &estHours,
+				DoneRatio:      100,
+				CreatedOn:      "2024-01-01T00:00:00Z",
+				UpdatedOn:      "2024-03-01T00:00:00Z",
+				ClosedOn:       &closedOn,
+				Description:    "A full description",
+			},
+		}
+		json.NewEncoder(w).Encode(resp)
+	}))
+	defer srv.Close()
+
+	f := newTestFactory(srv)
+	cmd := NewCmdView(f)
+	setupRootFlags(cmd, "table")
+	cmd.SetArgs([]string{"42"})
+
+	err := cmd.Execute()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	out := f.IO.Out.(*bytes.Buffer).String()
+	for _, want := range []string{
+		"Category:    Backend",
+		"Version:     v1.0",
+		"Parent:      #10",
+		"Start:       2024-01-15",
+		"Due:         2024-02-15",
+		"Estimated:   8.50h",
+		"Closed:      2024-03-01T00:00:00Z",
+		"A full description",
+	} {
+		if !bytes.Contains([]byte(out), []byte(want)) {
+			t.Errorf("expected output to contain %q, got:\n%s", want, out)
+		}
+	}
+}
+
 func TestViewCommand_Unassigned(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		resp := struct {
