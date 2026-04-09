@@ -10,8 +10,9 @@ import (
 )
 
 func NewCmdCreate(f *cmdutil.Factory) *cobra.Command {
-	var trackerID, priorityID, assignedToID int
-	var projectID, subject, description string
+	var trackerID, priorityID, assignedToID, categoryID, versionID, parentID, doneRatio int
+	var estimatedHours float64
+	var projectID, subject, description, startDate, dueDate string
 
 	cmd := &cobra.Command{
 		Use:     "create",
@@ -37,12 +38,19 @@ func NewCmdCreate(f *cmdutil.Factory) *cobra.Command {
 			}
 
 			params := api.IssueCreateParams{
-				ProjectID:    parsedProjectID,
-				TrackerID:    trackerID,
-				PriorityID:   priorityID,
-				Subject:      subject,
-				Description:  description,
-				AssignedToID: assignedToID,
+				ProjectID:      parsedProjectID,
+				TrackerID:      trackerID,
+				PriorityID:     priorityID,
+				Subject:        subject,
+				Description:    description,
+				AssignedToID:   assignedToID,
+				CategoryID:     categoryID,
+				FixedVersionID: versionID,
+				ParentIssueID:  parentID,
+				StartDate:      startDate,
+				DueDate:        dueDate,
+				EstimatedHours: estimatedHours,
+				DoneRatio:      doneRatio,
 			}
 
 			issue, err := client.CreateIssue(cmd.Context(), params)
@@ -72,6 +80,13 @@ func NewCmdCreate(f *cmdutil.Factory) *cobra.Command {
 	cmd.Flags().IntVarP(&trackerID, "tracker", "t", 0, "Tracker ID")
 	cmd.Flags().IntVar(&priorityID, "priority", 0, "Priority ID")
 	cmd.Flags().IntVarP(&assignedToID, "assignee", "a", 0, "Assignee user ID")
+	cmd.Flags().IntVar(&categoryID, "category", 0, "Category ID")
+	cmd.Flags().IntVar(&versionID, "version", 0, "Target version ID")
+	cmd.Flags().IntVar(&parentID, "parent", 0, "Parent issue ID")
+	cmd.Flags().StringVar(&startDate, "start-date", "", "Start date (YYYY-MM-DD)")
+	cmd.Flags().StringVar(&dueDate, "due-date", "", "Due date (YYYY-MM-DD)")
+	cmd.Flags().Float64Var(&estimatedHours, "estimated-hours", 0, "Estimated hours")
+	cmd.Flags().IntVar(&doneRatio, "done-ratio", 0, "Done ratio (0-100)")
 
 	return cmd
 }

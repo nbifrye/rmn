@@ -204,6 +204,30 @@ func TestListCommand_WithFilters(t *testing.T) {
 	}
 }
 
+func TestListCommand_WithSort(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Query().Get("sort") != "updated_on:desc" {
+			t.Errorf("expected sort=updated_on:desc, got %s", r.URL.Query().Get("sort"))
+		}
+		resp := struct {
+			Issues     []api.Issue `json:"issues"`
+			TotalCount int         `json:"total_count"`
+		}{Issues: []api.Issue{}, TotalCount: 0}
+		json.NewEncoder(w).Encode(resp)
+	}))
+	defer srv.Close()
+
+	f := newTestFactory(srv)
+	cmd := NewCmdList(f)
+	setupRootFlags(cmd, "table")
+	cmd.SetArgs([]string{"--sort", "updated_on:desc"})
+
+	err := cmd.Execute()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
 func TestListCommand_EmptyResult(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		resp := struct {

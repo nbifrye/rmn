@@ -155,6 +155,61 @@ func TestCreateCommand_AllFlags(t *testing.T) {
 	}
 }
 
+func TestCreateCommand_ExtendedFlags(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var body map[string]interface{}
+		json.NewDecoder(r.Body).Decode(&body)
+		issue := body["issue"].(map[string]interface{})
+		if issue["start_date"] != "2024-01-01" {
+			t.Errorf("expected start_date '2024-01-01', got %v", issue["start_date"])
+		}
+		if issue["due_date"] != "2024-12-31" {
+			t.Errorf("expected due_date '2024-12-31', got %v", issue["due_date"])
+		}
+		if issue["estimated_hours"] != float64(8) {
+			t.Errorf("expected estimated_hours 8, got %v", issue["estimated_hours"])
+		}
+		if issue["done_ratio"] != float64(50) {
+			t.Errorf("expected done_ratio 50, got %v", issue["done_ratio"])
+		}
+		if issue["parent_issue_id"] != float64(10) {
+			t.Errorf("expected parent_issue_id 10, got %v", issue["parent_issue_id"])
+		}
+		if issue["fixed_version_id"] != float64(3) {
+			t.Errorf("expected fixed_version_id 3, got %v", issue["fixed_version_id"])
+		}
+		if issue["category_id"] != float64(2) {
+			t.Errorf("expected category_id 2, got %v", issue["category_id"])
+		}
+		w.WriteHeader(http.StatusCreated)
+		resp := struct {
+			Issue api.Issue `json:"issue"`
+		}{Issue: api.Issue{ID: 1, Subject: "test"}}
+		json.NewEncoder(w).Encode(resp)
+	}))
+	defer srv.Close()
+
+	f := newTestFactory(srv)
+	cmd := NewCmdCreate(f)
+	setupRootFlags(cmd, "table")
+	cmd.SetArgs([]string{
+		"--project", "test",
+		"--subject", "Extended issue",
+		"--start-date", "2024-01-01",
+		"--due-date", "2024-12-31",
+		"--estimated-hours", "8",
+		"--done-ratio", "50",
+		"--parent", "10",
+		"--version", "3",
+		"--category", "2",
+	})
+
+	err := cmd.Execute()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
 func TestCreateCommand_APIClientError(t *testing.T) {
 	f := &cmdutil.Factory{
 		Config: func() (*config.Config, error) { return &config.Config{}, nil },

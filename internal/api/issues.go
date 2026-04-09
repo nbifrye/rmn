@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/url"
 	"strconv"
+	"strings"
 )
 
 type issuesResponse struct {
@@ -43,6 +44,9 @@ func (c *Client) ListIssues(ctx context.Context, params IssueListParams) ([]Issu
 	if params.Limit > 0 {
 		q.Set("limit", strconv.Itoa(params.Limit))
 	}
+	if params.Sort != "" {
+		q.Set("sort", params.Sort)
+	}
 	if params.Offset > 0 {
 		q.Set("offset", strconv.Itoa(params.Offset))
 	}
@@ -54,9 +58,14 @@ func (c *Client) ListIssues(ctx context.Context, params IssueListParams) ([]Issu
 	return resp.Issues, resp.TotalCount, nil
 }
 
-func (c *Client) GetIssue(ctx context.Context, id int) (*Issue, error) {
+func (c *Client) GetIssue(ctx context.Context, id int, include []string) (*Issue, error) {
+	var q url.Values
+	if len(include) > 0 {
+		q = url.Values{}
+		q.Set("include", strings.Join(include, ","))
+	}
 	var resp issueResponse
-	if err := c.Get(ctx, fmt.Sprintf("/issues/%d.json", id), nil, &resp); err != nil {
+	if err := c.Get(ctx, fmt.Sprintf("/issues/%d.json", id), q, &resp); err != nil {
 		return nil, err
 	}
 	return &resp.Issue, nil
