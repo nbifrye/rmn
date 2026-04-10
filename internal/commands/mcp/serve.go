@@ -55,6 +55,18 @@ func newCmdServe(f *cmdutil.Factory, version string) *cobra.Command {
 
 func boolPtr(b bool) *bool { return &b }
 
+// capturedHandlers, when non-nil, is populated by addTool with every handler
+// registered via registerXxxTools functions. It is intended for tests only.
+var capturedHandlers map[string]mcp.ToolHandler
+
+// addTool wraps mcp.Server.AddTool so tests can capture handlers.
+func addTool(s *mcp.Server, tool *mcp.Tool, handler mcp.ToolHandler) {
+	s.AddTool(tool, handler)
+	if capturedHandlers != nil {
+		capturedHandlers[tool.Name] = handler
+	}
+}
+
 func textResult(text string) *mcp.CallToolResult {
 	return &mcp.CallToolResult{
 		Content: []mcp.Content{&mcp.TextContent{Text: text}},
@@ -202,6 +214,15 @@ func registerTools(s *mcp.Server, client *api.Client) {
 	for i, tool := range tools {
 		s.AddTool(tool, handlers[i])
 	}
+
+	registerProjectTools(s, client)
+	registerUserTools(s, client)
+	registerVersionTools(s, client)
+	registerTimeEntryTools(s, client)
+	registerMembershipTools(s, client)
+	registerWikiTools(s, client)
+	registerTrackerTools(s, client)
+	registerStatusTools(s, client)
 }
 
 // toJSON marshals a value to indented JSON. It is a variable so tests can replace it.
