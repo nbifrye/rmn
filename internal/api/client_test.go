@@ -399,6 +399,61 @@ func TestResponseBodySizeLimit(t *testing.T) {
 	}
 }
 
+func TestPutWithResult_WithBody(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPut {
+			t.Errorf("expected PUT, got %s", r.Method)
+		}
+		w.WriteHeader(http.StatusCreated)
+		w.Write([]byte(`{"id": 1, "name": "created"}`))
+	}))
+	defer srv.Close()
+
+	c := NewClient(srv.URL, "key")
+	var result map[string]interface{}
+	err := c.PutWithResult(context.Background(), "/test.json", map[string]string{"key": "value"}, &result)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if result["name"] != "created" {
+		t.Errorf("expected name=created, got %v", result["name"])
+	}
+}
+
+func TestPutWithResult_NoContent(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusNoContent)
+	}))
+	defer srv.Close()
+
+	c := NewClient(srv.URL, "key")
+	var result map[string]interface{}
+	err := c.PutWithResult(context.Background(), "/test.json", map[string]string{"key": "value"}, &result)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestPutWithResult_NetworkFailure(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {}))
+	srv.Close()
+
+	c := NewClient(srv.URL, "key")
+	var result map[string]interface{}
+	err := c.PutWithResult(context.Background(), "/test.json", map[string]string{"key": "val"}, &result)
+	if err == nil {
+		t.Fatal("expected error for closed server")
+	}
+}
+
+func TestPutWithResult_NewRequestError(t *testing.T) {
+	c := NewClient("://invalid", "key")
+	err := c.PutWithResult(context.Background(), "/test", nil, nil)
+	if err == nil {
+		t.Fatal("expected error for invalid URL")
+	}
+}
+
 func TestNewClient_TLSMinVersion(t *testing.T) {
 	c := NewClient("https://example.com", "key")
 	transport, ok := c.HTTPClient.Transport.(*http.Transport)

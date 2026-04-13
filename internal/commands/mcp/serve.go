@@ -148,6 +148,7 @@ func toolDefs() []*mcp.Tool {
 					"due_date":         map[string]any{"type": "string", "description": "Due date in YYYY-MM-DD format"},
 					"estimated_hours":  map[string]any{"type": "number", "description": "Estimated hours for the issue"},
 					"done_ratio":       map[string]any{"type": "number", "description": "Done ratio (0-100)"},
+					"is_private":       map[string]any{"type": "boolean", "description": "Whether the issue is private (only visible to roles with permission)"},
 				},
 				"required": []string{"project_id", "subject"},
 			},
@@ -177,7 +178,10 @@ func toolDefs() []*mcp.Tool {
 					"due_date":         map[string]any{"type": "string", "description": "New due date in YYYY-MM-DD format"},
 					"estimated_hours":  map[string]any{"type": "number", "description": "New estimated hours"},
 					"done_ratio":       map[string]any{"type": "number", "description": "New done ratio (0-100)"},
+					"tracker_id":       map[string]any{"type": "number", "description": "New tracker ID (values are specific to your Redmine instance)"},
 					"notes":            map[string]any{"type": "string", "description": "Add a comment/note to the issue"},
+					"private_notes":    map[string]any{"type": "boolean", "description": "Whether the notes should be marked as private (only visible to roles with permission)"},
+					"is_private":       map[string]any{"type": "boolean", "description": "Whether the issue is private (only visible to roles with permission)"},
 				},
 				"required": []string{"issue_id"},
 			},
@@ -436,6 +440,9 @@ func makeCreateIssueHandler(client *api.Client) mcp.ToolHandler {
 			EstimatedHours: getFloat64Arg(args, "estimated_hours"),
 			DoneRatio:      getIntArg(args, "done_ratio"),
 		}
+		if v, ok := args["is_private"].(bool); ok {
+			params.IsPrivate = v
+		}
 
 		issue, err := client.CreateIssue(ctx, params)
 		if err != nil {
@@ -464,6 +471,7 @@ func makeUpdateIssueHandler(client *api.Client) mcp.ToolHandler {
 			Description:    getStringPtrArg(args, "description"),
 			StatusID:       getIntPtrArg(args, "status_id"),
 			PriorityID:     getIntPtrArg(args, "priority_id"),
+			TrackerID:      getIntPtrArg(args, "tracker_id"),
 			AssignedToID:   getIntPtrArg(args, "assigned_to_id"),
 			CategoryID:     getIntPtrArg(args, "category_id"),
 			FixedVersionID: getIntPtrArg(args, "fixed_version_id"),
@@ -473,6 +481,12 @@ func makeUpdateIssueHandler(client *api.Client) mcp.ToolHandler {
 			EstimatedHours: getFloat64PtrArg(args, "estimated_hours"),
 			DoneRatio:      getIntPtrArg(args, "done_ratio"),
 			Notes:          getStringArg(args, "notes"),
+		}
+		if v, ok := args["private_notes"].(bool); ok {
+			params.PrivateNotes = v
+		}
+		if v, ok := args["is_private"].(bool); ok {
+			params.IsPrivate = &v
 		}
 
 		if err := client.UpdateIssue(ctx, id, params); err != nil {

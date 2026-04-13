@@ -32,7 +32,7 @@ func (c *Client) ListWikiPages(ctx context.Context, projectID string) ([]WikiPag
 }
 
 func (c *Client) GetWikiPage(ctx context.Context, projectID string, title string, version int) (*WikiPageDetail, error) {
-	path := fmt.Sprintf("/projects/%s/wiki/%s.json", projectID, title)
+	path := fmt.Sprintf("/projects/%s/wiki/%s.json", projectID, url.PathEscape(title))
 	var q url.Values
 	if version > 0 {
 		q = url.Values{}
@@ -47,16 +47,16 @@ func (c *Client) GetWikiPage(ctx context.Context, projectID string, title string
 
 func (c *Client) CreateWikiPage(ctx context.Context, projectID string, title string, params WikiPageCreateParams) (*WikiPageDetail, error) {
 	var resp wikiPageResponse
-	if err := c.Post(ctx, fmt.Sprintf("/projects/%s/wiki/%s.json", projectID, title), wikiPageWriteRequest{WikiPage: params}, &resp); err != nil {
+	if err := c.PutWithResult(ctx, fmt.Sprintf("/projects/%s/wiki/%s.json", projectID, url.PathEscape(title)), wikiPageWriteRequest{WikiPage: params}, &resp); err != nil {
 		return nil, err
 	}
 	return &resp.WikiPage, nil
 }
 
 func (c *Client) UpdateWikiPage(ctx context.Context, projectID string, title string, params WikiPageUpdateParams) error {
-	return c.Put(ctx, fmt.Sprintf("/projects/%s/wiki/%s.json", projectID, title), wikiPageUpdateRequest{WikiPage: params})
+	return c.Put(ctx, fmt.Sprintf("/projects/%s/wiki/%s.json", projectID, url.PathEscape(title)), wikiPageUpdateRequest{WikiPage: params})
 }
 
 func (c *Client) DeleteWikiPage(ctx context.Context, projectID string, title string) error {
-	return c.Delete(ctx, fmt.Sprintf("/projects/%s/wiki/%s.json", projectID, title))
+	return c.Delete(ctx, fmt.Sprintf("/projects/%s/wiki/%s.json", projectID, url.PathEscape(title)))
 }

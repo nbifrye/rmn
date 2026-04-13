@@ -182,7 +182,7 @@ type User struct {
 
 // UserListParams holds parameters for listing users.
 type UserListParams struct {
-	Status  int    // 0=active(default), 1=registered, 2=locked
+	Status  int    // 1=active, 2=registered, 3=locked (0 means no filter)
 	Name    string // filter by name/login
 	GroupID int
 	Offset  int
