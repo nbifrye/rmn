@@ -1,6 +1,6 @@
 # rmn
 
-> rmnはGo言語で書かれた非公式のRedmineコマンドラインクライアントです。チケットのライフサイクル管理（一覧表示、閲覧、作成、更新、クローズ、削除）と、AIエージェント連携用の内蔵Model Context Protocol（MCP）サーバーを提供します。
+> rmnはGo言語で書かれた非公式のRedmineコマンドラインクライアントです。Redmine REST APIの主要リソース（チケット、プロジェクト、ユーザー、バージョン、作業時間、メンバーシップ、Wikiページ、トラッカー、チケットステータス）をカバーし、AIエージェント連携用の内蔵Model Context Protocol（MCP）サーバーも提供します。
 
 > 警告: このプロジェクトは実験的な段階です。APIおよびCLIインターフェースはまだ安定しておらず、予告なく破壊的変更が加わる可能性があります。
 
@@ -20,19 +20,53 @@ Homebrew（`brew tap nbifrye/rmn https://github.com/nbifrye/rmn.git && brew inst
 
 ## CLIコマンド
 
+チケット:
 - `rmn issue list`（エイリアス: `ls`）— フィルタ付きチケット一覧表示: `-p` プロジェクト、`-s` ステータス、`-a` 担当者、`-t` トラッカー、`--sort`、`-l` 上限、`--offset`
 - `rmn issue view <id>`（エイリアス: `show`, `get`）— チケットの詳細表示
 - `rmn issue create`（エイリアス: `new`）— チケット作成: `-p` プロジェクト（必須）、`-s` 題名（必須）、`-d` 説明、`-t` トラッカー、`--priority`、`-a` 担当者
 - `rmn issue update <id>` — チケットのフィールドを更新、`-n` でノートを追加
 - `rmn issue close <id>` — チケットをクローズ（デフォルトステータス5）、オプションで `--status` と `-n`
 - `rmn issue delete <id>`（エイリアス: `rm`）— チケットを削除、`-y` で確認をスキップ
-- `rmn auth login` — Redmineインスタンスで認証
-- `rmn auth status` — 認証状態を表示
+
+プロジェクト:
+- `rmn project list` / `view <id>` / `create` / `update` / `archive` / `unarchive` / `delete <id>`
+
+ユーザー:
+- `rmn user list` / `view <id|me>` — ユーザーの一覧と詳細表示（`me` で現在のAPIキーに対応するユーザー）
+
+バージョン:
+- `rmn version list -p <project>` / `view <id>` / `create -p <project> --name` / `update <id>` / `delete <id>`
+
+作業時間:
+- `rmn time-entry list` / `view <id>` / `create --issue|-p --hours` / `update <id>` / `delete <id>`
+
+メンバーシップ:
+- `rmn membership list -p <project>` / `view <id>` / `create -p --user --role` / `update <id> --role` / `delete <id>`
+
+Wikiページ:
+- `rmn wiki list -p <project>` / `view <title> -p <project>` / `create <title> -p --text` / `update <title> -p --text` / `delete <title> -p`
+
+参照データ:
+- `rmn tracker list`
+- `rmn status list`
+
+認証とグローバル:
+- `rmn auth login` / `rmn auth status`
 - グローバルフラグ: `--output`（table/json）、`--redmine-url`、`--api-key`
 
 ## MCPサーバー
 
-`rmn mcp serve`（stdioトランスポート）で起動。利用可能なツール: `list_issues`、`get_issue`、`create_issue`、`update_issue`、`delete_issue`。各ツールにはMCPアノテーション（readOnlyHint, destructiveHint, idempotentHint, openWorldHint）が含まれます。
+`rmn mcp serve`（stdioトランスポート）で起動。利用可能なツール:
+- チケット: `list_issues`、`get_issue`、`create_issue`、`update_issue`、`delete_issue`
+- プロジェクト: `list_projects`、`get_project`、`create_project`、`update_project`、`archive_project`、`unarchive_project`、`delete_project`
+- ユーザー: `list_users`、`get_user`、`get_current_user`
+- バージョン: `list_versions`、`get_version`、`create_version`、`update_version`、`delete_version`
+- 作業時間: `list_time_entries`、`get_time_entry`、`create_time_entry`、`update_time_entry`、`delete_time_entry`
+- メンバーシップ: `list_memberships`、`get_membership`、`create_membership`、`update_membership`、`delete_membership`
+- Wiki: `list_wiki_pages`、`get_wiki_page`、`create_or_update_wiki_page`、`delete_wiki_page`
+- 参照データ: `list_trackers`、`list_issue_statuses`
+
+各ツールにはMCPアノテーション（readOnlyHint, destructiveHint, idempotentHint, openWorldHint）が含まれます。
 
 Claude Codeでの設定:
 ```json

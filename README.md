@@ -7,7 +7,7 @@
 
 **[日本語版 README はこちら](README.ja.md)**
 
-**rmn** is an unofficial command-line client for [Redmine](https://www.redmine.org/) written in Go. It provides a fast, intuitive interface for managing Redmine issues directly from your terminal. Inspired by [GitLab CLI (glab)](https://gitlab.com/gitlab-org/cli), rmn brings familiar command patterns to the Redmine ecosystem.
+**rmn** is an unofficial command-line client for [Redmine](https://www.redmine.org/) written in Go. It provides a fast, intuitive interface for managing Redmine issues, projects, users, versions, time entries, memberships, wiki pages, and more, directly from your terminal. Inspired by [GitLab CLI (glab)](https://gitlab.com/gitlab-org/cli), rmn brings familiar command patterns to the Redmine ecosystem.
 
 rmn also includes a built-in [Model Context Protocol (MCP)](https://modelcontextprotocol.io/) server, enabling AI agents such as Claude Code to interact with your Redmine instance through natural language. Whether you prefer the keyboard or an AI assistant, rmn gives you full control over Redmine issue management via the Redmine REST API.
 
@@ -17,6 +17,7 @@ rmn also includes a built-in [Model Context Protocol (MCP)](https://modelcontext
 
 ## Features
 
+- **Broad Redmine API coverage** -- issues, projects, users, versions, time entries, memberships, wiki pages, trackers and issue statuses
 - **Full issue lifecycle management** -- list, view, create, update, close, and delete Redmine issues from the command line
 - **MCP server for AI agents** -- expose Redmine operations to AI assistants like Claude Code via the Model Context Protocol
 - **Multiple output formats** -- human-readable table (default) and machine-readable JSON for scripting and automation
@@ -183,6 +184,78 @@ rmn issue delete 42                               # Delete with confirmation pro
 rmn issue delete 42 -y                            # Skip confirmation
 ```
 
+### Projects
+
+```bash
+rmn project list                                  # List active projects
+rmn project list --status archived                # Filter by status
+rmn project view my-project                       # View by identifier or numeric ID
+rmn project view my-project --include trackers,issue_categories
+rmn project create --name "New Project" --identifier new-project -d "Description"
+rmn project update my-project --name "Renamed"
+rmn project archive my-project                    # Hide but preserve
+rmn project unarchive my-project
+rmn project delete my-project -y                  # Permanent delete
+```
+
+### Users
+
+```bash
+rmn user list                                     # List active users (admin required)
+rmn user list --status 1 --name ali
+rmn user view 42                                  # View user by ID
+rmn user view me                                  # Current user (whose API key is in use)
+```
+
+### Versions
+
+```bash
+rmn version list -p my-project                    # List project versions/milestones
+rmn version view 10
+rmn version create -p my-project --name v1.0 --due-date 2026-06-01
+rmn version update 10 --status locked
+rmn version delete 10 -y
+```
+
+### Time Entries
+
+```bash
+rmn time-entry list                               # List all time entries visible to you
+rmn time-entry list -p my-project --from 2026-01-01 --to 2026-03-31
+rmn time-entry create --issue 42 --hours 1.5 -c "Debugging"
+rmn time-entry create -p my-project --hours 2 --activity 9
+rmn time-entry update 5 --hours 2.5
+rmn time-entry delete 5 -y
+```
+
+### Memberships
+
+```bash
+rmn membership list -p my-project                 # List project members
+rmn membership view 3
+rmn membership create -p my-project --user 5 --role 3 --role 4
+rmn membership update 3 --role 4
+rmn membership delete 3 -y
+```
+
+### Wiki Pages
+
+```bash
+rmn wiki list -p my-project                       # List wiki pages
+rmn wiki view Home -p my-project                  # View page content
+rmn wiki view Home -p my-project --version 3      # Historical version
+rmn wiki create Home -p my-project --text "h1. Hello"
+rmn wiki update Home -p my-project --text "h1. Updated"
+rmn wiki delete Home -p my-project -y
+```
+
+### Trackers & Statuses (reference data)
+
+```bash
+rmn tracker list                                  # List trackers (Bug, Feature, etc.)
+rmn status list                                   # List issue statuses
+```
+
 ### Command Aliases
 
 | Command              | Aliases        |
@@ -231,13 +304,44 @@ This starts a stdio-based MCP server.
 
 ### Available MCP tools
 
-| Tool             | Description                          | Read-only | Destructive |
-|------------------|--------------------------------------|-----------|-------------|
-| `list_issues`    | List and filter Redmine issues       | Yes       | No          |
-| `get_issue`      | Get full details of an issue         | Yes       | No          |
-| `create_issue`   | Create a new issue                   | No        | No          |
-| `update_issue`   | Update an existing issue             | No        | No          |
-| `delete_issue`   | Permanently delete an issue          | No        | Yes         |
+| Tool                         | Description                          | Read-only | Destructive |
+|------------------------------|--------------------------------------|-----------|-------------|
+| `list_issues`                | List and filter Redmine issues       | Yes       | No          |
+| `get_issue`                  | Get full details of an issue         | Yes       | No          |
+| `create_issue`               | Create a new issue                   | No        | No          |
+| `update_issue`               | Update an existing issue             | No        | No          |
+| `delete_issue`               | Permanently delete an issue          | No        | Yes         |
+| `list_projects`              | List and filter projects             | Yes       | No          |
+| `get_project`                | Get full details of a project        | Yes       | No          |
+| `create_project`             | Create a new project                 | No        | No          |
+| `update_project`             | Update an existing project           | No        | No          |
+| `archive_project`            | Archive a project (reversible)       | No        | No          |
+| `unarchive_project`          | Unarchive a previously archived project | No    | No          |
+| `delete_project`             | Permanently delete a project         | No        | Yes         |
+| `list_users`                 | List and filter users                | Yes       | No          |
+| `get_user`                   | Get full details of a user           | Yes       | No          |
+| `get_current_user`           | Get the user for the current API key | Yes      | No          |
+| `list_versions`              | List versions of a project           | Yes       | No          |
+| `get_version`                | Get full details of a version        | Yes       | No          |
+| `create_version`             | Create a new version                 | No        | No          |
+| `update_version`             | Update an existing version           | No        | No          |
+| `delete_version`             | Permanently delete a version         | No        | Yes         |
+| `list_time_entries`          | List and filter time entries         | Yes       | No          |
+| `get_time_entry`             | Get full details of a time entry     | Yes       | No          |
+| `create_time_entry`          | Log time spent on an issue/project   | No        | No          |
+| `update_time_entry`          | Update an existing time entry        | No        | No          |
+| `delete_time_entry`          | Permanently delete a time entry      | No        | Yes         |
+| `list_memberships`           | List project memberships             | Yes       | No          |
+| `get_membership`             | Get full details of a membership     | Yes       | No          |
+| `create_membership`          | Add a user to a project              | No        | No          |
+| `update_membership`          | Update membership roles              | No        | No          |
+| `delete_membership`          | Remove a membership                  | No        | Yes         |
+| `list_wiki_pages`            | List wiki pages in a project         | Yes       | No          |
+| `get_wiki_page`              | Get the content of a wiki page       | Yes       | No          |
+| `create_or_update_wiki_page` | Create or update a wiki page         | No        | No          |
+| `delete_wiki_page`           | Permanently delete a wiki page       | No        | Yes         |
+| `list_trackers`              | List trackers (issue types)          | Yes       | No          |
+| `list_issue_statuses`        | List issue statuses                  | Yes       | No          |
 
 Each tool includes MCP annotations (`readOnlyHint`, `destructiveHint`, `idempotentHint`, `openWorldHint`) to help AI agents understand the impact of each operation.
 
@@ -286,7 +390,8 @@ rmn completion powershell | Out-String | Invoke-Expression
 ```
 cmd/rmn/main.go          Entry point (signal handling, factory, root command)
 internal/api/             Redmine HTTP client + domain types
-internal/commands/        Cobra command tree (root, auth, issue, mcp)
+internal/commands/        Cobra command tree (root, auth, issue, project, user,
+                          version, timeentry, membership, wiki, tracker, status, mcp)
 internal/cmdutil/         Factory (dependency injection), IOStreams
 internal/config/          XDG-compliant JSON config (~/.config/rmn/config.json)
 ```

@@ -1,6 +1,6 @@
 # rmn
 
-> rmn is an unofficial command-line client for Redmine written in Go. It provides full issue lifecycle management (list, view, create, update, close, delete) and a built-in Model Context Protocol (MCP) server for AI agent integration.
+> rmn is an unofficial command-line client for Redmine written in Go. It covers the main Redmine REST APIs — issues, projects, users, versions, time entries, memberships, wiki pages, trackers and issue statuses — and includes a built-in Model Context Protocol (MCP) server for AI agent integration.
 
 > Warning: This project is experimental. The API and CLI interface are not yet stable and may introduce breaking changes without notice.
 
@@ -20,19 +20,53 @@ Run `rmn auth login --url https://your-redmine.example.com --api-key YOUR_API_KE
 
 ## CLI Commands
 
+Issues:
 - `rmn issue list` (alias: `ls`) — List issues with filters: `-p` project, `-s` status, `-a` assignee, `-t` tracker, `--sort`, `-l` limit, `--offset`
 - `rmn issue view <id>` (aliases: `show`, `get`) — View issue details
 - `rmn issue create` (alias: `new`) — Create issue: `-p` project (required), `-s` subject (required), `-d` description, `-t` tracker, `--priority`, `-a` assignee
 - `rmn issue update <id>` — Update issue fields and add notes with `-n`
 - `rmn issue close <id>` — Close issue (default status 5), with optional `--status` and `-n`
 - `rmn issue delete <id>` (alias: `rm`) — Delete issue, `-y` to skip confirmation
-- `rmn auth login` — Authenticate with Redmine instance
-- `rmn auth status` — Show authentication status
+
+Projects:
+- `rmn project list` / `view <id>` / `create` / `update` / `archive` / `unarchive` / `delete <id>`
+
+Users:
+- `rmn user list` / `view <id|me>` — list and view users (`me` returns the current API key's user)
+
+Versions:
+- `rmn version list -p <project>` / `view <id>` / `create -p <project> --name` / `update <id>` / `delete <id>`
+
+Time entries:
+- `rmn time-entry list` (alias: `time ls`) / `view <id>` / `create --issue|-p --hours` / `update <id>` / `delete <id>`
+
+Memberships:
+- `rmn membership list -p <project>` / `view <id>` / `create -p --user --role` / `update <id> --role` / `delete <id>`
+
+Wiki pages:
+- `rmn wiki list -p <project>` / `view <title> -p <project>` / `create <title> -p --text` / `update <title> -p --text` / `delete <title> -p`
+
+Reference data:
+- `rmn tracker list`
+- `rmn status list`
+
+Auth & global:
+- `rmn auth login` / `rmn auth status`
 - Global flags: `--output` (table/json), `--redmine-url`, `--api-key`
 
 ## MCP Server
 
-Start with `rmn mcp serve` (stdio transport). Available tools: `list_issues`, `get_issue`, `create_issue`, `update_issue`, `delete_issue`. Each tool includes MCP annotations (readOnlyHint, destructiveHint, idempotentHint, openWorldHint).
+Start with `rmn mcp serve` (stdio transport). Available tools:
+- Issues: `list_issues`, `get_issue`, `create_issue`, `update_issue`, `delete_issue`
+- Projects: `list_projects`, `get_project`, `create_project`, `update_project`, `archive_project`, `unarchive_project`, `delete_project`
+- Users: `list_users`, `get_user`, `get_current_user`
+- Versions: `list_versions`, `get_version`, `create_version`, `update_version`, `delete_version`
+- Time entries: `list_time_entries`, `get_time_entry`, `create_time_entry`, `update_time_entry`, `delete_time_entry`
+- Memberships: `list_memberships`, `get_membership`, `create_membership`, `update_membership`, `delete_membership`
+- Wiki: `list_wiki_pages`, `get_wiki_page`, `create_or_update_wiki_page`, `delete_wiki_page`
+- Reference: `list_trackers`, `list_issue_statuses`
+
+Each tool includes MCP annotations (readOnlyHint, destructiveHint, idempotentHint, openWorldHint).
 
 Configure in Claude Code:
 ```json

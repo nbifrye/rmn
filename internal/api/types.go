@@ -169,10 +169,214 @@ type PaginatedResponse struct {
 
 // User represents a Redmine user.
 type User struct {
-	ID        int    `json:"id"`
-	Login     string `json:"login"`
-	FirstName string `json:"firstname"`
-	LastName  string `json:"lastname"`
-	Mail      string `json:"mail"`
-	CreatedOn string `json:"created_on"`
+	ID          int    `json:"id"`
+	Login       string `json:"login"`
+	FirstName   string `json:"firstname"`
+	LastName    string `json:"lastname"`
+	Mail        string `json:"mail"`
+	Admin       bool   `json:"admin,omitempty"`
+	Status      int    `json:"status,omitempty"`
+	LastLoginOn string `json:"last_login_on,omitempty"`
+	CreatedOn   string `json:"created_on"`
+}
+
+// UserListParams holds parameters for listing users.
+type UserListParams struct {
+	Status  int    // 0=active(default), 1=registered, 2=locked
+	Name    string // filter by name/login
+	GroupID int
+	Offset  int
+	Limit   int
+}
+
+// IssueStatus represents a Redmine issue status.
+type IssueStatus struct {
+	ID       int  `json:"id"`
+	Name     string `json:"name"`
+	IsClosed bool   `json:"is_closed"`
+}
+
+// Project represents a Redmine project.
+type Project struct {
+	ID          int      `json:"id"`
+	Name        string   `json:"name"`
+	Identifier  string   `json:"identifier"`
+	Description string   `json:"description"`
+	Homepage    string   `json:"homepage,omitempty"`
+	Status      int      `json:"status"`
+	IsPublic    bool     `json:"is_public"`
+	Parent      *IdName  `json:"parent,omitempty"`
+	CreatedOn   string   `json:"created_on"`
+	UpdatedOn   string   `json:"updated_on"`
+	Trackers    []IdName `json:"trackers,omitempty"`
+}
+
+// ProjectCreateParams holds parameters for creating a project.
+type ProjectCreateParams struct {
+	Name           string `json:"name"`
+	Identifier     string `json:"identifier"`
+	Description    string `json:"description,omitempty"`
+	Homepage       string `json:"homepage,omitempty"`
+	IsPublic       bool   `json:"is_public,omitempty"`
+	ParentID       int    `json:"parent_id,omitempty"`
+	InheritMembers bool   `json:"inherit_members,omitempty"`
+}
+
+// ProjectUpdateParams holds parameters for updating a project.
+// Pointer fields distinguish "not provided" (nil) from "set to zero value".
+type ProjectUpdateParams struct {
+	Name           *string `json:"name,omitempty"`
+	Description    *string `json:"description,omitempty"`
+	Homepage       *string `json:"homepage,omitempty"`
+	IsPublic       *bool   `json:"is_public,omitempty"`
+	ParentID       *int    `json:"parent_id,omitempty"`
+	InheritMembers *bool   `json:"inherit_members,omitempty"`
+}
+
+// ProjectListParams holds parameters for listing projects.
+type ProjectListParams struct {
+	Status string // active, closed, archived
+	Offset int
+	Limit  int
+}
+
+// Version represents a Redmine project version.
+type Version struct {
+	ID            int     `json:"id"`
+	Project       IdName  `json:"project"`
+	Name          string  `json:"name"`
+	Description   string  `json:"description"`
+	Status        string  `json:"status"`
+	DueDate       *string `json:"due_date"`
+	Sharing       string  `json:"sharing"`
+	WikiPageTitle string  `json:"wiki_page_title,omitempty"`
+	CreatedOn     string  `json:"created_on"`
+	UpdatedOn     string  `json:"updated_on"`
+}
+
+// VersionCreateParams holds parameters for creating a version.
+type VersionCreateParams struct {
+	Name          string `json:"name"`
+	Status        string `json:"status,omitempty"`
+	Sharing       string `json:"sharing,omitempty"`
+	DueDate       string `json:"due_date,omitempty"`
+	Description   string `json:"description,omitempty"`
+	WikiPageTitle string `json:"wiki_page_title,omitempty"`
+}
+
+// VersionUpdateParams holds parameters for updating a version.
+type VersionUpdateParams struct {
+	Name          *string `json:"name,omitempty"`
+	Status        *string `json:"status,omitempty"`
+	Sharing       *string `json:"sharing,omitempty"`
+	DueDate       *string `json:"due_date,omitempty"`
+	Description   *string `json:"description,omitempty"`
+	WikiPageTitle *string `json:"wiki_page_title,omitempty"`
+}
+
+// TimeEntry represents a Redmine time entry.
+type TimeEntry struct {
+	ID        int     `json:"id"`
+	Project   IdName  `json:"project"`
+	Issue     *IdName `json:"issue,omitempty"`
+	User      IdName  `json:"user"`
+	Activity  IdName  `json:"activity"`
+	Hours     float64 `json:"hours"`
+	Comments  string  `json:"comments"`
+	SpentOn   string  `json:"spent_on"`
+	CreatedOn string  `json:"created_on"`
+	UpdatedOn string  `json:"updated_on"`
+}
+
+// TimeEntryCreateParams holds parameters for creating a time entry.
+type TimeEntryCreateParams struct {
+	IssueID    int     `json:"issue_id,omitempty"`
+	ProjectID  string  `json:"project_id,omitempty"`
+	SpentOn    string  `json:"spent_on,omitempty"`
+	Hours      float64 `json:"hours"`
+	ActivityID int     `json:"activity_id,omitempty"`
+	Comments   string  `json:"comments,omitempty"`
+}
+
+// TimeEntryUpdateParams holds parameters for updating a time entry.
+type TimeEntryUpdateParams struct {
+	IssueID    *int     `json:"issue_id,omitempty"`
+	ProjectID  *string  `json:"project_id,omitempty"`
+	SpentOn    *string  `json:"spent_on,omitempty"`
+	Hours      *float64 `json:"hours,omitempty"`
+	ActivityID *int     `json:"activity_id,omitempty"`
+	Comments   *string  `json:"comments,omitempty"`
+}
+
+// TimeEntryListParams holds parameters for listing time entries.
+type TimeEntryListParams struct {
+	ProjectID  string
+	IssueID    int
+	UserID     int
+	SpentOn    string
+	From       string
+	To         string
+	ActivityID int
+	Offset     int
+	Limit      int
+}
+
+// Membership represents a Redmine project membership.
+type Membership struct {
+	ID      int      `json:"id"`
+	Project IdName   `json:"project"`
+	User    *IdName  `json:"user,omitempty"`
+	Group   *IdName  `json:"group,omitempty"`
+	Roles   []IdName `json:"roles"`
+}
+
+// MembershipCreateParams holds parameters for creating a membership.
+type MembershipCreateParams struct {
+	UserID  int   `json:"user_id"`
+	RoleIDs []int `json:"role_ids"`
+}
+
+// MembershipUpdateParams holds parameters for updating a membership.
+type MembershipUpdateParams struct {
+	RoleIDs []int `json:"role_ids"`
+}
+
+// MembershipListParams holds parameters for listing memberships.
+type MembershipListParams struct {
+	Offset int
+	Limit  int
+}
+
+// WikiPage represents a Redmine wiki page in index listings.
+type WikiPage struct {
+	Title     string  `json:"title"`
+	Parent    *IdName `json:"parent,omitempty"`
+	Version   int     `json:"version"`
+	CreatedOn string  `json:"created_on"`
+	UpdatedOn string  `json:"updated_on"`
+}
+
+// WikiPageDetail represents a full Redmine wiki page with content.
+type WikiPageDetail struct {
+	Title     string  `json:"title"`
+	Parent    *IdName `json:"parent,omitempty"`
+	Text      string  `json:"text"`
+	Version   int     `json:"version"`
+	Author    IdName  `json:"author"`
+	Comments  string  `json:"comments"`
+	CreatedOn string  `json:"created_on"`
+	UpdatedOn string  `json:"updated_on"`
+}
+
+// WikiPageCreateParams holds parameters for creating a wiki page.
+type WikiPageCreateParams struct {
+	Text     string `json:"text"`
+	Comments string `json:"comments,omitempty"`
+}
+
+// WikiPageUpdateParams holds parameters for updating a wiki page.
+type WikiPageUpdateParams struct {
+	Text     *string `json:"text,omitempty"`
+	Comments *string `json:"comments,omitempty"`
+	Version  *int    `json:"version,omitempty"`
 }

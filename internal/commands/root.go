@@ -5,6 +5,14 @@ import (
 	"github.com/nbifrye/rmn/internal/commands/auth"
 	"github.com/nbifrye/rmn/internal/commands/issue"
 	"github.com/nbifrye/rmn/internal/commands/mcp"
+	"github.com/nbifrye/rmn/internal/commands/membership"
+	"github.com/nbifrye/rmn/internal/commands/project"
+	"github.com/nbifrye/rmn/internal/commands/status"
+	"github.com/nbifrye/rmn/internal/commands/timeentry"
+	"github.com/nbifrye/rmn/internal/commands/tracker"
+	"github.com/nbifrye/rmn/internal/commands/user"
+	versioncmd "github.com/nbifrye/rmn/internal/commands/version"
+	"github.com/nbifrye/rmn/internal/commands/wiki"
 	"github.com/spf13/cobra"
 )
 
@@ -34,6 +42,14 @@ func NewCmdRoot(f *cmdutil.Factory, version string) *cobra.Command {
 	cmd.AddCommand(auth.NewCmdAuth(f))
 	cmd.AddCommand(issue.NewCmdIssue(f))
 	cmd.AddCommand(mcp.NewCmdMcp(f, version))
+	cmd.AddCommand(project.NewCmdProject(f))
+	cmd.AddCommand(user.NewCmdUser(f))
+	cmd.AddCommand(versioncmd.NewCmdVersion(f))
+	cmd.AddCommand(timeentry.NewCmdTimeEntry(f))
+	cmd.AddCommand(membership.NewCmdMembership(f))
+	cmd.AddCommand(wiki.NewCmdWiki(f))
+	cmd.AddCommand(tracker.NewCmdTracker(f))
+	cmd.AddCommand(status.NewCmdStatus(f))
 	cmd.AddCommand(newCmdCompletion())
 
 	return cmd
