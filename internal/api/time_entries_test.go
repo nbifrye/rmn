@@ -147,3 +147,67 @@ func TestListTimeEntries_APIError(t *testing.T) {
 		t.Fatal("expected error")
 	}
 }
+
+func TestListTimeEntries_AllParams(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		q := r.URL.Query()
+		if q.Get("issue_id") != "5" {
+			t.Errorf("expected issue_id=5, got %s", q.Get("issue_id"))
+		}
+		if q.Get("user_id") != "3" {
+			t.Errorf("expected user_id=3, got %s", q.Get("user_id"))
+		}
+		if q.Get("spent_on") != "2024-01-15" {
+			t.Errorf("expected spent_on=2024-01-15, got %s", q.Get("spent_on"))
+		}
+		if q.Get("activity_id") != "9" {
+			t.Errorf("expected activity_id=9, got %s", q.Get("activity_id"))
+		}
+		if q.Get("limit") != "20" {
+			t.Errorf("expected limit=20, got %s", q.Get("limit"))
+		}
+		if q.Get("offset") != "10" {
+			t.Errorf("expected offset=10, got %s", q.Get("offset"))
+		}
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"time_entries": []map[string]interface{}{}, "total_count": 0,
+		})
+	}))
+	defer srv.Close()
+
+	client := NewClient(srv.URL, "test-key")
+	_, _, err := client.ListTimeEntries(context.Background(), TimeEntryListParams{
+		IssueID: 5, UserID: 3, SpentOn: "2024-01-15", ActivityID: 9, Limit: 20, Offset: 10,
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestGetTimeEntry_Error(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusNotFound)
+		w.Write([]byte(`{"errors":["Not found"]}`))
+	}))
+	defer srv.Close()
+
+	client := NewClient(srv.URL, "test-key")
+	_, err := client.GetTimeEntry(context.Background(), 999)
+	if err == nil {
+		t.Fatal("expected error")
+	}
+}
+
+func TestCreateTimeEntry_Error(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusUnprocessableEntity)
+		w.Write([]byte(`{"errors":["Invalid"]}`))
+	}))
+	defer srv.Close()
+
+	client := NewClient(srv.URL, "test-key")
+	_, err := client.CreateTimeEntry(context.Background(), TimeEntryCreateParams{Hours: 1.0, IssueID: 1})
+	if err == nil {
+		t.Fatal("expected error")
+	}
+}

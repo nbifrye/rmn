@@ -3,6 +3,7 @@ package mcp
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -139,11 +140,17 @@ func TestProjectTools(t *testing.T) {
 	if _, isErr := invokeTool(t, h["get_project"], map[string]interface{}{"project_id": "alpha"}); isErr {
 		t.Error("get_project failed")
 	}
+	if _, isErr := invokeTool(t, h["get_project"], map[string]interface{}{"project_id": "alpha", "include": "trackers,issue_categories"}); isErr {
+		t.Error("get_project with include failed")
+	}
 	if _, isErr := invokeTool(t, h["get_project"], map[string]interface{}{}); !isErr {
 		t.Error("expected error when project_id missing")
 	}
 	if _, isErr := invokeTool(t, h["create_project"], map[string]interface{}{"name": "Beta", "identifier": "beta"}); isErr {
 		t.Error("create_project failed")
+	}
+	if _, isErr := invokeTool(t, h["create_project"], map[string]interface{}{"name": "Beta", "identifier": "beta", "is_public": true}); isErr {
+		t.Error("create_project with is_public failed")
 	}
 	if _, isErr := invokeTool(t, h["create_project"], map[string]interface{}{"identifier": "beta"}); !isErr {
 		t.Error("expected error when name missing")
@@ -489,6 +496,492 @@ func TestWikiTools(t *testing.T) {
 	}
 	if _, isErr := invokeTool(t, h["delete_wiki_page"], map[string]interface{}{"project_id": "alpha"}); !isErr {
 		t.Error("expected error for missing title")
+	}
+}
+
+// --- Error helpers ---------------------------------------------------------
+
+func errorServer() *httptest.Server {
+	return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusInternalServerError)
+		w.Write([]byte(`{"errors":["Server error"]}`))
+	}))
+}
+
+func errorClient(srv *httptest.Server) *api.Client {
+	return api.NewClient(srv.URL, "k")
+}
+
+// --- Tracker & Status error tests ------------------------------------------
+
+func TestTrackerTools_APIError(t *testing.T) {
+	srv := errorServer()
+	defer srv.Close()
+	h := registerAndCapture(t, registerTrackerTools, errorClient(srv))
+	if _, isErr := invokeTool(t, h["list_trackers"], nil); !isErr {
+		t.Error("expected error")
+	}
+}
+
+func TestTrackerTools_MarshalError(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"trackers": []map[string]interface{}{{"id": 1, "name": "Bug"}},
+		})
+	}))
+	defer srv.Close()
+	client := api.NewClient(srv.URL, "k")
+	h := registerAndCapture(t, registerTrackerTools, client)
+
+	origToJSON := toJSON
+	toJSON = func(v interface{}) (string, error) { return "", fmt.Errorf("marshal error") }
+	defer func() { toJSON = origToJSON }()
+
+	if _, isErr := invokeTool(t, h["list_trackers"], nil); !isErr {
+		t.Error("expected marshal error")
+	}
+}
+
+func TestStatusTools_APIError(t *testing.T) {
+	srv := errorServer()
+	defer srv.Close()
+	h := registerAndCapture(t, registerStatusTools, errorClient(srv))
+	if _, isErr := invokeTool(t, h["list_issue_statuses"], nil); !isErr {
+		t.Error("expected error")
+	}
+}
+
+func TestStatusTools_MarshalError(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"issue_statuses": []map[string]interface{}{{"id": 1, "name": "New", "is_closed": false}},
+		})
+	}))
+	defer srv.Close()
+	client := api.NewClient(srv.URL, "k")
+	h := registerAndCapture(t, registerStatusTools, client)
+
+	origToJSON := toJSON
+	toJSON = func(v interface{}) (string, error) { return "", fmt.Errorf("marshal error") }
+	defer func() { toJSON = origToJSON }()
+
+	if _, isErr := invokeTool(t, h["list_issue_statuses"], nil); !isErr {
+		t.Error("expected marshal error")
+	}
+}
+
+// --- Project error tests ---------------------------------------------------
+
+func TestProjectTools_APIErrors(t *testing.T) {
+	srv := errorServer()
+	defer srv.Close()
+	h := registerAndCapture(t, registerProjectTools, errorClient(srv))
+
+	tests := []struct {
+		tool string
+		args map[string]interface{}
+	}{
+		{"list_projects", nil},
+		{"get_project", map[string]interface{}{"project_id": "alpha"}},
+		{"create_project", map[string]interface{}{"name": "X", "identifier": "x"}},
+		{"update_project", map[string]interface{}{"project_id": "alpha", "name": "X"}},
+		{"archive_project", map[string]interface{}{"project_id": "alpha"}},
+		{"unarchive_project", map[string]interface{}{"project_id": "alpha"}},
+		{"delete_project", map[string]interface{}{"project_id": "alpha"}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.tool, func(t *testing.T) {
+			if _, isErr := invokeTool(t, h[tt.tool], tt.args); !isErr {
+				t.Error("expected error")
+			}
+		})
+	}
+}
+
+func TestProjectTools_MarshalErrors(t *testing.T) {
+	srv := projectServer()
+	defer srv.Close()
+	client := api.NewClient(srv.URL, "k")
+	h := registerAndCapture(t, registerProjectTools, client)
+
+	origToJSON := toJSON
+	toJSON = func(v interface{}) (string, error) { return "", fmt.Errorf("marshal error") }
+	defer func() { toJSON = origToJSON }()
+
+	tests := []struct {
+		tool string
+		args map[string]interface{}
+	}{
+		{"list_projects", nil},
+		{"get_project", map[string]interface{}{"project_id": "alpha"}},
+		{"create_project", map[string]interface{}{"name": "Beta", "identifier": "beta"}},
+		{"update_project", map[string]interface{}{"project_id": "alpha", "name": "X"}},
+		{"archive_project", map[string]interface{}{"project_id": "alpha"}},
+		{"unarchive_project", map[string]interface{}{"project_id": "alpha"}},
+		{"delete_project", map[string]interface{}{"project_id": "alpha"}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.tool, func(t *testing.T) {
+			if _, isErr := invokeTool(t, h[tt.tool], tt.args); !isErr {
+				t.Error("expected marshal error")
+			}
+		})
+	}
+}
+
+// --- User error tests ------------------------------------------------------
+
+func TestUserTools_APIErrors(t *testing.T) {
+	srv := errorServer()
+	defer srv.Close()
+	h := registerAndCapture(t, registerUserTools, errorClient(srv))
+
+	tests := []struct {
+		tool string
+		args map[string]interface{}
+	}{
+		{"list_users", nil},
+		{"get_user", map[string]interface{}{"user_id": 1}},
+		{"get_current_user", nil},
+	}
+	for _, tt := range tests {
+		t.Run(tt.tool, func(t *testing.T) {
+			if _, isErr := invokeTool(t, h[tt.tool], tt.args); !isErr {
+				t.Error("expected error")
+			}
+		})
+	}
+}
+
+func TestUserTools_MarshalErrors(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/users.json":
+			json.NewEncoder(w).Encode(map[string]interface{}{"users": []map[string]interface{}{{"id": 1}}, "total_count": 1})
+		case "/users/1.json":
+			json.NewEncoder(w).Encode(map[string]interface{}{"user": map[string]interface{}{"id": 1}})
+		case "/users/current.json":
+			json.NewEncoder(w).Encode(map[string]interface{}{"user": map[string]interface{}{"id": 1}})
+		}
+	}))
+	defer srv.Close()
+	client := api.NewClient(srv.URL, "k")
+	h := registerAndCapture(t, registerUserTools, client)
+
+	origToJSON := toJSON
+	toJSON = func(v interface{}) (string, error) { return "", fmt.Errorf("marshal error") }
+	defer func() { toJSON = origToJSON }()
+
+	tests := []struct {
+		tool string
+		args map[string]interface{}
+	}{
+		{"list_users", nil},
+		{"get_user", map[string]interface{}{"user_id": 1}},
+		{"get_current_user", nil},
+	}
+	for _, tt := range tests {
+		t.Run(tt.tool, func(t *testing.T) {
+			if _, isErr := invokeTool(t, h[tt.tool], tt.args); !isErr {
+				t.Error("expected marshal error")
+			}
+		})
+	}
+}
+
+// --- Version error tests ---------------------------------------------------
+
+func versionServer() *httptest.Server {
+	return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case r.URL.Path == "/projects/alpha/versions.json" && r.Method == http.MethodGet:
+			json.NewEncoder(w).Encode(map[string]interface{}{"versions": []map[string]interface{}{{"id": 10, "name": "v1"}}, "total_count": 1})
+		case r.URL.Path == "/versions/10.json" && r.Method == http.MethodGet:
+			json.NewEncoder(w).Encode(map[string]interface{}{"version": map[string]interface{}{"id": 10, "name": "v1"}})
+		case r.URL.Path == "/projects/alpha/versions.json" && r.Method == http.MethodPost:
+			w.WriteHeader(http.StatusCreated)
+			json.NewEncoder(w).Encode(map[string]interface{}{"version": map[string]interface{}{"id": 11, "name": "v2"}})
+		case r.URL.Path == "/versions/10.json" && r.Method == http.MethodPut:
+			w.WriteHeader(http.StatusNoContent)
+		case r.URL.Path == "/versions/10.json" && r.Method == http.MethodDelete:
+			w.WriteHeader(http.StatusOK)
+		default:
+			w.WriteHeader(http.StatusNotFound)
+		}
+	}))
+}
+
+func TestVersionTools_APIErrors(t *testing.T) {
+	srv := errorServer()
+	defer srv.Close()
+	h := registerAndCapture(t, registerVersionTools, errorClient(srv))
+
+	tests := []struct {
+		tool string
+		args map[string]interface{}
+	}{
+		{"list_versions", map[string]interface{}{"project_id": "alpha"}},
+		{"get_version", map[string]interface{}{"version_id": 10}},
+		{"create_version", map[string]interface{}{"project_id": "alpha", "name": "v2"}},
+		{"update_version", map[string]interface{}{"version_id": 10, "name": "v1.1"}},
+		{"delete_version", map[string]interface{}{"version_id": 10}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.tool, func(t *testing.T) {
+			if _, isErr := invokeTool(t, h[tt.tool], tt.args); !isErr {
+				t.Error("expected error")
+			}
+		})
+	}
+}
+
+func TestVersionTools_MarshalErrors(t *testing.T) {
+	srv := versionServer()
+	defer srv.Close()
+	client := api.NewClient(srv.URL, "k")
+	h := registerAndCapture(t, registerVersionTools, client)
+
+	origToJSON := toJSON
+	toJSON = func(v interface{}) (string, error) { return "", fmt.Errorf("marshal error") }
+	defer func() { toJSON = origToJSON }()
+
+	tests := []struct {
+		tool string
+		args map[string]interface{}
+	}{
+		{"list_versions", map[string]interface{}{"project_id": "alpha"}},
+		{"get_version", map[string]interface{}{"version_id": 10}},
+		{"create_version", map[string]interface{}{"project_id": "alpha", "name": "v2"}},
+		{"update_version", map[string]interface{}{"version_id": 10, "name": "v1.1"}},
+		{"delete_version", map[string]interface{}{"version_id": 10}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.tool, func(t *testing.T) {
+			if _, isErr := invokeTool(t, h[tt.tool], tt.args); !isErr {
+				t.Error("expected marshal error")
+			}
+		})
+	}
+}
+
+// --- Time Entry error tests ------------------------------------------------
+
+func timeEntryServer() *httptest.Server {
+	return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case r.URL.Path == "/time_entries.json" && r.Method == http.MethodGet:
+			json.NewEncoder(w).Encode(map[string]interface{}{"time_entries": []map[string]interface{}{{"id": 5, "hours": 1.5}}, "total_count": 1})
+		case r.URL.Path == "/time_entries/5.json" && r.Method == http.MethodGet:
+			json.NewEncoder(w).Encode(map[string]interface{}{"time_entry": map[string]interface{}{"id": 5, "hours": 1.5}})
+		case r.URL.Path == "/time_entries.json" && r.Method == http.MethodPost:
+			w.WriteHeader(http.StatusCreated)
+			json.NewEncoder(w).Encode(map[string]interface{}{"time_entry": map[string]interface{}{"id": 6, "hours": 2.0}})
+		case r.URL.Path == "/time_entries/5.json" && r.Method == http.MethodPut:
+			w.WriteHeader(http.StatusNoContent)
+		case r.URL.Path == "/time_entries/5.json" && r.Method == http.MethodDelete:
+			w.WriteHeader(http.StatusOK)
+		default:
+			w.WriteHeader(http.StatusNotFound)
+		}
+	}))
+}
+
+func TestTimeEntryTools_APIErrors(t *testing.T) {
+	srv := errorServer()
+	defer srv.Close()
+	h := registerAndCapture(t, registerTimeEntryTools, errorClient(srv))
+
+	tests := []struct {
+		tool string
+		args map[string]interface{}
+	}{
+		{"list_time_entries", nil},
+		{"get_time_entry", map[string]interface{}{"time_entry_id": 5}},
+		{"create_time_entry", map[string]interface{}{"issue_id": 1, "hours": 2.0}},
+		{"update_time_entry", map[string]interface{}{"time_entry_id": 5, "hours": 3.0}},
+		{"delete_time_entry", map[string]interface{}{"time_entry_id": 5}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.tool, func(t *testing.T) {
+			if _, isErr := invokeTool(t, h[tt.tool], tt.args); !isErr {
+				t.Error("expected error")
+			}
+		})
+	}
+}
+
+func TestTimeEntryTools_MarshalErrors(t *testing.T) {
+	srv := timeEntryServer()
+	defer srv.Close()
+	client := api.NewClient(srv.URL, "k")
+	h := registerAndCapture(t, registerTimeEntryTools, client)
+
+	origToJSON := toJSON
+	toJSON = func(v interface{}) (string, error) { return "", fmt.Errorf("marshal error") }
+	defer func() { toJSON = origToJSON }()
+
+	tests := []struct {
+		tool string
+		args map[string]interface{}
+	}{
+		{"list_time_entries", nil},
+		{"get_time_entry", map[string]interface{}{"time_entry_id": 5}},
+		{"create_time_entry", map[string]interface{}{"issue_id": 1, "hours": 2.0}},
+		{"update_time_entry", map[string]interface{}{"time_entry_id": 5, "hours": 3.0}},
+		{"delete_time_entry", map[string]interface{}{"time_entry_id": 5}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.tool, func(t *testing.T) {
+			if _, isErr := invokeTool(t, h[tt.tool], tt.args); !isErr {
+				t.Error("expected marshal error")
+			}
+		})
+	}
+}
+
+// --- Membership error tests ------------------------------------------------
+
+func membershipServer() *httptest.Server {
+	return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case r.URL.Path == "/projects/alpha/memberships.json" && r.Method == http.MethodGet:
+			json.NewEncoder(w).Encode(map[string]interface{}{"memberships": []map[string]interface{}{{"id": 1}}, "total_count": 1})
+		case r.URL.Path == "/memberships/1.json" && r.Method == http.MethodGet:
+			json.NewEncoder(w).Encode(map[string]interface{}{"membership": map[string]interface{}{"id": 1}})
+		case r.URL.Path == "/projects/alpha/memberships.json" && r.Method == http.MethodPost:
+			w.WriteHeader(http.StatusCreated)
+			json.NewEncoder(w).Encode(map[string]interface{}{"membership": map[string]interface{}{"id": 2}})
+		case r.URL.Path == "/memberships/1.json" && r.Method == http.MethodPut:
+			w.WriteHeader(http.StatusNoContent)
+		case r.URL.Path == "/memberships/1.json" && r.Method == http.MethodDelete:
+			w.WriteHeader(http.StatusOK)
+		default:
+			w.WriteHeader(http.StatusNotFound)
+		}
+	}))
+}
+
+func TestMembershipTools_APIErrors(t *testing.T) {
+	srv := errorServer()
+	defer srv.Close()
+	h := registerAndCapture(t, registerMembershipTools, errorClient(srv))
+
+	tests := []struct {
+		tool string
+		args map[string]interface{}
+	}{
+		{"list_memberships", map[string]interface{}{"project_id": "alpha"}},
+		{"get_membership", map[string]interface{}{"membership_id": 1}},
+		{"create_membership", map[string]interface{}{"project_id": "alpha", "user_id": 1, "role_ids": []interface{}{3.0}}},
+		{"update_membership", map[string]interface{}{"membership_id": 1, "role_ids": []interface{}{3.0}}},
+		{"delete_membership", map[string]interface{}{"membership_id": 1}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.tool, func(t *testing.T) {
+			if _, isErr := invokeTool(t, h[tt.tool], tt.args); !isErr {
+				t.Error("expected error")
+			}
+		})
+	}
+}
+
+func TestMembershipTools_MarshalErrors(t *testing.T) {
+	srv := membershipServer()
+	defer srv.Close()
+	client := api.NewClient(srv.URL, "k")
+	h := registerAndCapture(t, registerMembershipTools, client)
+
+	origToJSON := toJSON
+	toJSON = func(v interface{}) (string, error) { return "", fmt.Errorf("marshal error") }
+	defer func() { toJSON = origToJSON }()
+
+	tests := []struct {
+		tool string
+		args map[string]interface{}
+	}{
+		{"list_memberships", map[string]interface{}{"project_id": "alpha"}},
+		{"get_membership", map[string]interface{}{"membership_id": 1}},
+		{"create_membership", map[string]interface{}{"project_id": "alpha", "user_id": 1, "role_ids": []interface{}{3.0}}},
+		{"update_membership", map[string]interface{}{"membership_id": 1, "role_ids": []interface{}{3.0}}},
+		{"delete_membership", map[string]interface{}{"membership_id": 1}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.tool, func(t *testing.T) {
+			if _, isErr := invokeTool(t, h[tt.tool], tt.args); !isErr {
+				t.Error("expected marshal error")
+			}
+		})
+	}
+}
+
+// --- Wiki error tests ------------------------------------------------------
+
+func wikiServer() *httptest.Server {
+	return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case r.URL.Path == "/projects/alpha/wiki/index.json" && r.Method == http.MethodGet:
+			json.NewEncoder(w).Encode(map[string]interface{}{"wiki_pages": []map[string]interface{}{{"title": "Home"}}})
+		case r.URL.Path == "/projects/alpha/wiki/Home.json" && r.Method == http.MethodGet:
+			json.NewEncoder(w).Encode(map[string]interface{}{"wiki_page": map[string]interface{}{"title": "Home", "text": "Hi"}})
+		case r.URL.Path == "/projects/alpha/wiki/Home.json" && (r.Method == http.MethodPut || r.Method == http.MethodPost):
+			w.WriteHeader(http.StatusCreated)
+			json.NewEncoder(w).Encode(map[string]interface{}{"wiki_page": map[string]interface{}{"title": "Home", "text": "Hi"}})
+		case r.URL.Path == "/projects/alpha/wiki/Home.json" && r.Method == http.MethodDelete:
+			w.WriteHeader(http.StatusOK)
+		default:
+			w.WriteHeader(http.StatusNotFound)
+		}
+	}))
+}
+
+func TestWikiTools_APIErrors(t *testing.T) {
+	srv := errorServer()
+	defer srv.Close()
+	h := registerAndCapture(t, registerWikiTools, errorClient(srv))
+
+	tests := []struct {
+		tool string
+		args map[string]interface{}
+	}{
+		{"list_wiki_pages", map[string]interface{}{"project_id": "alpha"}},
+		{"get_wiki_page", map[string]interface{}{"project_id": "alpha", "title": "Home"}},
+		{"create_or_update_wiki_page", map[string]interface{}{"project_id": "alpha", "title": "Home", "text": "Hi"}},
+		{"delete_wiki_page", map[string]interface{}{"project_id": "alpha", "title": "Home"}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.tool, func(t *testing.T) {
+			if _, isErr := invokeTool(t, h[tt.tool], tt.args); !isErr {
+				t.Error("expected error")
+			}
+		})
+	}
+}
+
+func TestWikiTools_MarshalErrors(t *testing.T) {
+	srv := wikiServer()
+	defer srv.Close()
+	client := api.NewClient(srv.URL, "k")
+	h := registerAndCapture(t, registerWikiTools, client)
+
+	origToJSON := toJSON
+	toJSON = func(v interface{}) (string, error) { return "", fmt.Errorf("marshal error") }
+	defer func() { toJSON = origToJSON }()
+
+	tests := []struct {
+		tool string
+		args map[string]interface{}
+	}{
+		{"list_wiki_pages", map[string]interface{}{"project_id": "alpha"}},
+		{"get_wiki_page", map[string]interface{}{"project_id": "alpha", "title": "Home"}},
+		{"create_or_update_wiki_page", map[string]interface{}{"project_id": "alpha", "title": "Home", "text": "Hi"}},
+		{"delete_wiki_page", map[string]interface{}{"project_id": "alpha", "title": "Home"}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.tool, func(t *testing.T) {
+			if _, isErr := invokeTool(t, h[tt.tool], tt.args); !isErr {
+				t.Error("expected marshal error")
+			}
+		})
 	}
 }
 

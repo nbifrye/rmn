@@ -199,3 +199,49 @@ func TestListProjects_APIError(t *testing.T) {
 		t.Fatal("expected error")
 	}
 }
+
+func TestListProjects_WithOffset(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Query().Get("offset") != "20" {
+			t.Errorf("expected offset=20, got %s", r.URL.Query().Get("offset"))
+		}
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"projects": []map[string]interface{}{}, "total_count": 0,
+		})
+	}))
+	defer srv.Close()
+
+	client := NewClient(srv.URL, "test-key")
+	_, _, err := client.ListProjects(context.Background(), ProjectListParams{Offset: 20})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestGetProject_Error(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusNotFound)
+		w.Write([]byte(`{"errors":["Not found"]}`))
+	}))
+	defer srv.Close()
+
+	client := NewClient(srv.URL, "test-key")
+	_, err := client.GetProject(context.Background(), "nonexistent", nil)
+	if err == nil {
+		t.Fatal("expected error")
+	}
+}
+
+func TestCreateProject_Error(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusUnprocessableEntity)
+		w.Write([]byte(`{"errors":["Name cannot be blank"]}`))
+	}))
+	defer srv.Close()
+
+	client := NewClient(srv.URL, "test-key")
+	_, err := client.CreateProject(context.Background(), ProjectCreateParams{Name: "Test", Identifier: "test"})
+	if err == nil {
+		t.Fatal("expected error")
+	}
+}

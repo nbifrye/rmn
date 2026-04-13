@@ -123,3 +123,52 @@ func TestListMemberships_APIError(t *testing.T) {
 		t.Fatal("expected error")
 	}
 }
+
+func TestListMemberships_WithLimitOffset(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Query().Get("limit") != "10" {
+			t.Errorf("expected limit=10, got %s", r.URL.Query().Get("limit"))
+		}
+		if r.URL.Query().Get("offset") != "5" {
+			t.Errorf("expected offset=5, got %s", r.URL.Query().Get("offset"))
+		}
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"memberships": []map[string]interface{}{}, "total_count": 0,
+		})
+	}))
+	defer srv.Close()
+
+	client := NewClient(srv.URL, "test-key")
+	_, _, err := client.ListMemberships(context.Background(), "test", MembershipListParams{Limit: 10, Offset: 5})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestGetMembership_Error(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusNotFound)
+		w.Write([]byte(`{"errors":["Not found"]}`))
+	}))
+	defer srv.Close()
+
+	client := NewClient(srv.URL, "test-key")
+	_, err := client.GetMembership(context.Background(), 999)
+	if err == nil {
+		t.Fatal("expected error")
+	}
+}
+
+func TestCreateMembership_Error(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusUnprocessableEntity)
+		w.Write([]byte(`{"errors":["Invalid"]}`))
+	}))
+	defer srv.Close()
+
+	client := NewClient(srv.URL, "test-key")
+	_, err := client.CreateMembership(context.Background(), "test", MembershipCreateParams{UserID: 1, RoleIDs: []int{1}})
+	if err == nil {
+		t.Fatal("expected error")
+	}
+}

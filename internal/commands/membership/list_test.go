@@ -144,3 +144,60 @@ func TestListCommand_APIClientError(t *testing.T) {
 		t.Fatal("expected error")
 	}
 }
+
+func TestListCommand_APIError(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusInternalServerError)
+	}))
+	defer srv.Close()
+
+	f := newTestFactory(srv)
+	cmd := NewCmdList(f)
+	setupRootFlags(cmd, "table")
+	cmd.SetArgs([]string{"--project", "test"})
+	if err := cmd.Execute(); err == nil {
+		t.Fatal("expected error")
+	}
+}
+
+func TestListCommand_FlushError(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"memberships": []map[string]interface{}{
+				{
+					"id":      1,
+					"project": map[string]interface{}{"id": 10, "name": "Alpha"},
+					"user":    map[string]interface{}{"id": 2, "name": "Alice"},
+					"roles":   []map[string]interface{}{{"id": 3, "name": "Developer"}},
+				},
+			},
+			"total_count": 1,
+		})
+	}))
+	defer srv.Close()
+
+	f := newTestFactory(srv)
+	f.IO.Out = &errWriter{failAfter: 0}
+	cmd := NewCmdList(f)
+	setupRootFlags(cmd, "table")
+	cmd.SetArgs([]string{"--project", "test"})
+	if err := cmd.Execute(); err == nil {
+		t.Fatal("expected error from flush")
+	}
+}
+
+type errWriter struct {
+	written   int
+	failAfter int
+}
+
+func (w *errWriter) Write(p []byte) (int, error) {
+	if w.written >= w.failAfter {
+		return 0, fmt.Errorf("write error")
+	}
+	w.written += len(p)
+	if w.written > w.failAfter {
+		return len(p), fmt.Errorf("write error")
+	}
+	return len(p), nil
+}

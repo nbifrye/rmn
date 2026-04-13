@@ -121,3 +121,31 @@ func TestListVersions_APIError(t *testing.T) {
 		t.Fatal("expected error")
 	}
 }
+
+func TestGetVersion_Error(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusNotFound)
+		w.Write([]byte(`{"errors":["Not found"]}`))
+	}))
+	defer srv.Close()
+
+	client := NewClient(srv.URL, "test-key")
+	_, err := client.GetVersion(context.Background(), 999)
+	if err == nil {
+		t.Fatal("expected error")
+	}
+}
+
+func TestCreateVersion_Error(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusUnprocessableEntity)
+		w.Write([]byte(`{"errors":["Invalid"]}`))
+	}))
+	defer srv.Close()
+
+	client := NewClient(srv.URL, "test-key")
+	_, err := client.CreateVersion(context.Background(), "test", VersionCreateParams{Name: "v1.0"})
+	if err == nil {
+		t.Fatal("expected error")
+	}
+}

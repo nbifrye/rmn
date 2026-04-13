@@ -11,6 +11,8 @@ import (
 	"testing"
 
 	"github.com/nbifrye/rmn/internal/api"
+	"github.com/nbifrye/rmn/internal/cmdutil"
+	"github.com/nbifrye/rmn/internal/config"
 )
 
 func TestCreateCommand_Success(t *testing.T) {
@@ -107,6 +109,37 @@ func TestCreateCommand_MarshalJSONError(t *testing.T) {
 	cmd := NewCmdCreate(f)
 	setupRootFlags(cmd, "json")
 	cmd.SetArgs([]string{"-p", "alpha", "--user", "2", "--role", "3"})
+	if err := cmd.Execute(); err == nil {
+		t.Fatal("expected error")
+	}
+}
+
+func TestCreateCommand_APIClientError(t *testing.T) {
+	f := &cmdutil.Factory{
+		Config: func() (*config.Config, error) { return &config.Config{}, nil },
+		APIClient: func() (*api.Client, error) {
+			return nil, fmt.Errorf("not configured")
+		},
+		IO: &cmdutil.IOStreams{In: &bytes.Buffer{}, Out: &bytes.Buffer{}, ErrOut: &bytes.Buffer{}},
+	}
+	cmd := NewCmdCreate(f)
+	setupRootFlags(cmd, "table")
+	cmd.SetArgs([]string{"--project", "test", "--user", "1", "--role", "1"})
+	if err := cmd.Execute(); err == nil {
+		t.Fatal("expected error")
+	}
+}
+
+func TestCreateCommand_APIError(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusInternalServerError)
+	}))
+	defer srv.Close()
+
+	f := newTestFactory(srv)
+	cmd := NewCmdCreate(f)
+	setupRootFlags(cmd, "table")
+	cmd.SetArgs([]string{"--project", "test", "--user", "1", "--role", "1"})
 	if err := cmd.Execute(); err == nil {
 		t.Fatal("expected error")
 	}

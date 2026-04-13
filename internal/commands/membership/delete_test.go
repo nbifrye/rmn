@@ -8,6 +8,10 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+
+	"github.com/nbifrye/rmn/internal/api"
+	"github.com/nbifrye/rmn/internal/cmdutil"
+	"github.com/nbifrye/rmn/internal/config"
 )
 
 func TestDeleteCommand_YesFlag(t *testing.T) {
@@ -121,6 +125,37 @@ func TestDeleteCommand_MarshalJSONError(t *testing.T) {
 	cmd := NewCmdDelete(f)
 	setupRootFlags(cmd, "json")
 	cmd.SetArgs([]string{"1", "-y"})
+	if err := cmd.Execute(); err == nil {
+		t.Fatal("expected error")
+	}
+}
+
+func TestDeleteCommand_APIClientError(t *testing.T) {
+	f := &cmdutil.Factory{
+		Config: func() (*config.Config, error) { return &config.Config{}, nil },
+		APIClient: func() (*api.Client, error) {
+			return nil, fmt.Errorf("not configured")
+		},
+		IO: &cmdutil.IOStreams{In: &bytes.Buffer{}, Out: &bytes.Buffer{}, ErrOut: &bytes.Buffer{}},
+	}
+	cmd := NewCmdDelete(f)
+	setupRootFlags(cmd, "table")
+	cmd.SetArgs([]string{"1", "--yes"})
+	if err := cmd.Execute(); err == nil {
+		t.Fatal("expected error")
+	}
+}
+
+func TestDeleteCommand_APIError(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusInternalServerError)
+	}))
+	defer srv.Close()
+
+	f := newTestFactory(srv)
+	cmd := NewCmdDelete(f)
+	setupRootFlags(cmd, "table")
+	cmd.SetArgs([]string{"1", "--yes"})
 	if err := cmd.Execute(); err == nil {
 		t.Fatal("expected error")
 	}

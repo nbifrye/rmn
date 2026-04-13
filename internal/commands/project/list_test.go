@@ -154,3 +154,59 @@ func TestListCommand_StatusStringFallback(t *testing.T) {
 		t.Errorf("expected fallback to number, got %s", got)
 	}
 }
+
+func TestListCommand_StatusStringClosed(t *testing.T) {
+	if got := projectStatusString(9); got != "closed" {
+		t.Errorf("expected closed, got %s", got)
+	}
+}
+
+func TestListCommand_APIError(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusInternalServerError)
+	}))
+	defer srv.Close()
+
+	f := newTestFactory(srv)
+	cmd := NewCmdList(f)
+	setupRootFlags(cmd, "table")
+	if err := cmd.Execute(); err == nil {
+		t.Fatal("expected error")
+	}
+}
+
+func TestListCommand_FlushError(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"projects": []map[string]interface{}{
+				{"id": 1, "name": "Alpha", "identifier": "alpha", "status": 1, "is_public": true},
+			},
+			"total_count": 1,
+		})
+	}))
+	defer srv.Close()
+
+	f := newTestFactory(srv)
+	f.IO.Out = &errWriter{failAfter: 0}
+	cmd := NewCmdList(f)
+	setupRootFlags(cmd, "table")
+	if err := cmd.Execute(); err == nil {
+		t.Fatal("expected error from flush")
+	}
+}
+
+type errWriter struct {
+	written   int
+	failAfter int
+}
+
+func (w *errWriter) Write(p []byte) (int, error) {
+	if w.written >= w.failAfter {
+		return 0, fmt.Errorf("write error")
+	}
+	w.written += len(p)
+	if w.written > w.failAfter {
+		return len(p), fmt.Errorf("write error")
+	}
+	return len(p), nil
+}

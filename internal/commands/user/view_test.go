@@ -278,3 +278,44 @@ func TestViewCommand_MissingArgs(t *testing.T) {
 		t.Fatal("expected error for missing args")
 	}
 }
+
+func TestViewCommand_MarshalJSONError(t *testing.T) {
+	original := marshalJSON
+	defer func() { marshalJSON = original }()
+	marshalJSON = func(v interface{}) ([]byte, error) { return nil, fmt.Errorf("marshal error") }
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		resp := struct {
+			User api.User `json:"user"`
+		}{
+			User: api.User{ID: 1, Login: "admin", FirstName: "Admin", LastName: "User"},
+		}
+		json.NewEncoder(w).Encode(resp)
+	}))
+	defer srv.Close()
+
+	f := newTestFactory(srv)
+	cmd := NewCmdView(f)
+	setupRootFlags(cmd, "json")
+	cmd.SetArgs([]string{"1"})
+	err := cmd.Execute()
+	if err == nil {
+		t.Fatal("expected error from marshalJSON")
+	}
+}
+
+func TestViewCommand_MeAPIError(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusInternalServerError)
+	}))
+	defer srv.Close()
+
+	f := newTestFactory(srv)
+	cmd := NewCmdView(f)
+	setupRootFlags(cmd, "table")
+	cmd.SetArgs([]string{"me"})
+	err := cmd.Execute()
+	if err == nil {
+		t.Fatal("expected error from GetCurrentUser")
+	}
+}

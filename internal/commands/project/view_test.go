@@ -114,3 +114,18 @@ func TestViewCommand_APIClientError(t *testing.T) {
 		t.Fatal("expected error")
 	}
 }
+
+func TestViewCommand_APIError(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusInternalServerError)
+	}))
+	defer srv.Close()
+
+	f := newTestFactory(srv)
+	cmd := NewCmdView(f)
+	setupRootFlags(cmd, "table")
+	cmd.SetArgs([]string{"test"})
+	if err := cmd.Execute(); err == nil {
+		t.Fatal("expected error")
+	}
+}

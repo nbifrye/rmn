@@ -109,3 +109,56 @@ func TestListUsers_APIError(t *testing.T) {
 		t.Fatal("expected error")
 	}
 }
+
+func TestListUsers_WithGroupID(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		q := r.URL.Query()
+		if q.Get("group_id") != "7" {
+			t.Errorf("expected group_id=7, got %s", q.Get("group_id"))
+		}
+		if q.Get("limit") != "15" {
+			t.Errorf("expected limit=15, got %s", q.Get("limit"))
+		}
+		if q.Get("offset") != "3" {
+			t.Errorf("expected offset=3, got %s", q.Get("offset"))
+		}
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"users": []map[string]interface{}{}, "total_count": 0,
+		})
+	}))
+	defer srv.Close()
+
+	client := NewClient(srv.URL, "test-key")
+	_, _, err := client.ListUsers(context.Background(), UserListParams{GroupID: 7, Limit: 15, Offset: 3})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestGetUser_Error(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusNotFound)
+		w.Write([]byte(`{"errors":["Not found"]}`))
+	}))
+	defer srv.Close()
+
+	client := NewClient(srv.URL, "test-key")
+	_, err := client.GetUser(context.Background(), 999)
+	if err == nil {
+		t.Fatal("expected error")
+	}
+}
+
+func TestGetCurrentUser_Error(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusInternalServerError)
+		w.Write([]byte(`{"errors":["Server error"]}`))
+	}))
+	defer srv.Close()
+
+	client := NewClient(srv.URL, "test-key")
+	_, err := client.GetCurrentUser(context.Background())
+	if err == nil {
+		t.Fatal("expected error")
+	}
+}

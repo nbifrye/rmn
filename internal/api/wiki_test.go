@@ -143,3 +143,31 @@ func TestListWikiPages_APIError(t *testing.T) {
 		t.Fatal("expected error")
 	}
 }
+
+func TestGetWikiPage_Error(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusNotFound)
+		w.Write([]byte(`{"errors":["Not found"]}`))
+	}))
+	defer srv.Close()
+
+	client := NewClient(srv.URL, "test-key")
+	_, err := client.GetWikiPage(context.Background(), "test", "Missing", 0)
+	if err == nil {
+		t.Fatal("expected error")
+	}
+}
+
+func TestCreateWikiPage_Error(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusUnprocessableEntity)
+		w.Write([]byte(`{"errors":["Invalid"]}`))
+	}))
+	defer srv.Close()
+
+	client := NewClient(srv.URL, "test-key")
+	_, err := client.CreateWikiPage(context.Background(), "test", "Page", WikiPageCreateParams{Text: "Hello"})
+	if err == nil {
+		t.Fatal("expected error")
+	}
+}

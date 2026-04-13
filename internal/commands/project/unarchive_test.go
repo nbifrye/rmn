@@ -8,6 +8,10 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+
+	"github.com/nbifrye/rmn/internal/api"
+	"github.com/nbifrye/rmn/internal/cmdutil"
+	"github.com/nbifrye/rmn/internal/config"
 )
 
 func TestUnarchiveCommand_Success(t *testing.T) {
@@ -77,6 +81,37 @@ func TestUnarchiveCommand_MarshalJSONError(t *testing.T) {
 	cmd := NewCmdUnarchive(f)
 	setupRootFlags(cmd, "json")
 	cmd.SetArgs([]string{"alpha"})
+	if err := cmd.Execute(); err == nil {
+		t.Fatal("expected error")
+	}
+}
+
+func TestUnarchiveCommand_APIClientError(t *testing.T) {
+	f := &cmdutil.Factory{
+		Config: func() (*config.Config, error) { return &config.Config{}, nil },
+		APIClient: func() (*api.Client, error) {
+			return nil, fmt.Errorf("not configured")
+		},
+		IO: &cmdutil.IOStreams{In: &bytes.Buffer{}, Out: &bytes.Buffer{}, ErrOut: &bytes.Buffer{}},
+	}
+	cmd := NewCmdUnarchive(f)
+	setupRootFlags(cmd, "table")
+	cmd.SetArgs([]string{"test"})
+	if err := cmd.Execute(); err == nil {
+		t.Fatal("expected error")
+	}
+}
+
+func TestUnarchiveCommand_APIError(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusInternalServerError)
+	}))
+	defer srv.Close()
+
+	f := newTestFactory(srv)
+	cmd := NewCmdUnarchive(f)
+	setupRootFlags(cmd, "table")
+	cmd.SetArgs([]string{"test"})
 	if err := cmd.Execute(); err == nil {
 		t.Fatal("expected error")
 	}
