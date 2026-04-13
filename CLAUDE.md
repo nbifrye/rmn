@@ -21,7 +21,8 @@ After any code change, always run:
 ```
 cmd/rmn/main.go          Entry point (signal handling, factory, root command)
 internal/api/             Redmine HTTP client + domain types
-internal/commands/        Cobra command tree (root, auth, issue, mcp)
+internal/commands/        Cobra command tree (root, auth, issue, project, user,
+                          version, timeentry, membership, wiki, tracker, status, mcp)
 internal/cmdutil/         Factory (DI), IOStreams
 internal/config/          XDG-compliant JSON config (~/.config/rmn/config.json)
 ```
@@ -70,13 +71,13 @@ When modifying code in these directories, update the corresponding documentation
 
 | Source | Documentation Files |
 |---|---|
-| `internal/commands/issue/` | `README.md` (Usage section), `docs/guide/usage.md` |
-| `internal/commands/mcp/serve.go` | `README.md` (MCP Server section), `docs/mcp-server.md`, `docs/public/llms.txt`, `docs/public/llms-full.txt` |
+| `internal/commands/issue/` | `docs/guide/usage.md` |
+| `internal/commands/mcp/serve.go` | `docs/mcp-server.md`, `docs/public/llms.txt`, `docs/public/llms-full.txt` |
 | `internal/commands/auth/` | `README.md` (Configuration section), `docs/guide/configuration.md` |
 | `internal/config/` | `README.md` (Configuration section), `docs/guide/configuration.md` |
-| `internal/api/` (security features) | `README.md` (Security section), `docs/reference/security.md` |
-| `internal/commands/root.go` (global flags) | `README.md` (Global Flags section), `docs/guide/usage.md` |
-| `cmd/rmn/` | `README.md` (Architecture section), `docs/reference/architecture.md` |
+| `internal/api/` (security features) | `docs/reference/security.md` |
+| `internal/commands/root.go` (global flags) | `docs/guide/usage.md` |
+| `cmd/rmn/` | `docs/reference/architecture.md` |
 | `internal/cmdutil/` | `docs/reference/architecture.md` |
 | `Makefile` | `README.md` (Development section), `docs/development.md` |
 
@@ -117,7 +118,7 @@ VitePress i18n is configured in `docs/.vitepress/config.mts` via the `locales` o
 ### Documentation Checklist
 
 When docs are needed, update all applicable locations:
-1. `README.md` — the relevant section (keeps README as the canonical reference)
+1. `README.md` — only if the change affects sections still in the README (features, installation, configuration basics)
 2. `docs/` — the corresponding VitePress page
 3. `docs/public/llms.txt` and `docs/public/llms-full.txt` — if CLI commands or MCP tools changed
 4. `CLAUDE.md` — if the change affects development workflow or conventions

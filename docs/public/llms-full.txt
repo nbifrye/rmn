@@ -389,7 +389,7 @@ internal/cmdutil/         Factory (dependency injection), IOStreams
 internal/config/          XDG-compliant JSON config (~/.config/rmn/config.json)
 ```
 
-rmn uses Cobra for the CLI framework and mcp-go for the MCP server implementation. The codebase follows a factory pattern for dependency injection, making all commands testable with mock HTTP servers.
+rmn uses Cobra for the CLI framework and go-sdk for the MCP server implementation. The codebase follows a factory pattern for dependency injection, making all commands testable with mock HTTP servers.
 
 ## Development
 
