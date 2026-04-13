@@ -444,7 +444,7 @@ func TestWikiTools(t *testing.T) {
 			json.NewEncoder(w).Encode(map[string]interface{}{
 				"wiki_page": map[string]interface{}{"title": "Home", "text": "Hello", "version": 1},
 			})
-		case r.URL.Path == "/projects/alpha/wiki/Home.json" && (r.Method == http.MethodPut || r.Method == http.MethodPost):
+		case r.URL.Path == "/projects/alpha/wiki/Home.json" && r.Method == http.MethodPut:
 			w.WriteHeader(http.StatusCreated)
 			json.NewEncoder(w).Encode(map[string]interface{}{
 				"wiki_page": map[string]interface{}{"title": "Home", "text": "Hi", "version": 2},
@@ -923,7 +923,7 @@ func wikiServer() *httptest.Server {
 			json.NewEncoder(w).Encode(map[string]interface{}{"wiki_pages": []map[string]interface{}{{"title": "Home"}}})
 		case r.URL.Path == "/projects/alpha/wiki/Home.json" && r.Method == http.MethodGet:
 			json.NewEncoder(w).Encode(map[string]interface{}{"wiki_page": map[string]interface{}{"title": "Home", "text": "Hi"}})
-		case r.URL.Path == "/projects/alpha/wiki/Home.json" && (r.Method == http.MethodPut || r.Method == http.MethodPost):
+		case r.URL.Path == "/projects/alpha/wiki/Home.json" && r.Method == http.MethodPut:
 			w.WriteHeader(http.StatusCreated)
 			json.NewEncoder(w).Encode(map[string]interface{}{"wiki_page": map[string]interface{}{"title": "Home", "text": "Hi"}})
 		case r.URL.Path == "/projects/alpha/wiki/Home.json" && r.Method == http.MethodDelete:

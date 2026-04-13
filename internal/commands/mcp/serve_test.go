@@ -751,8 +751,11 @@ func TestUpdateIssueHandler_WithAllFields(t *testing.T) {
 		"description":    "New description",
 		"status_id":      3,
 		"priority_id":    2,
+		"tracker_id":     1,
 		"assigned_to_id": 5,
 		"notes":          "A note",
+		"private_notes":  true,
+		"is_private":     true,
 	})
 	if isErr {
 		t.Fatalf("unexpected error: %s", text)
@@ -770,6 +773,7 @@ func TestCreateIssueHandler_WithAllFields(t *testing.T) {
 		"tracker_id":     1,
 		"priority_id":    2,
 		"assigned_to_id": 3,
+		"is_private":     true,
 	})
 	if isErr {
 		t.Fatalf("unexpected error: %s", text)

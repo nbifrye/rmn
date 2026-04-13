@@ -126,6 +126,14 @@ func (c *Client) Put(ctx context.Context, path string, body interface{}) error {
 	return c.do(req, nil)
 }
 
+func (c *Client) PutWithResult(ctx context.Context, path string, body interface{}, result interface{}) error {
+	req, err := c.newRequest(ctx, http.MethodPut, path, body)
+	if err != nil {
+		return err
+	}
+	return c.do(req, result)
+}
+
 func (c *Client) Delete(ctx context.Context, path string) error {
 	req, err := c.newRequest(ctx, http.MethodDelete, path, nil)
 	if err != nil {
