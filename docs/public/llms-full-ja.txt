@@ -389,7 +389,7 @@ internal/cmdutil/         ファクトリ（依存性注入）、IOStreams
 internal/config/          XDG準拠のJSON設定（~/.config/rmn/config.json）
 ```
 
-rmnはCLIフレームワークにCobraを、MCPサーバーの実装にmcp-goを使用しています。コードベースは依存性注入にファクトリパターンを採用しており、すべてのコマンドをモックHTTPサーバーでテスト可能にしています。
+rmnはCLIフレームワークにCobraを、MCPサーバーの実装にgo-sdkを使用しています。コードベースは依存性注入にファクトリパターンを採用しており、すべてのコマンドをモックHTTPサーバーでテスト可能にしています。
 
 ## 開発
 

@@ -8,7 +8,8 @@ description: rmn project architecture — module structure and key dependencies.
 ```
 cmd/rmn/main.go          Entry point (signal handling, factory, root command)
 internal/api/             Redmine HTTP client + domain types
-internal/commands/        Cobra command tree (root, auth, issue, mcp)
+internal/commands/        Cobra command tree (root, auth, issue, project, user,
+                          version, timeentry, membership, wiki, tracker, status, mcp)
 internal/cmdutil/         Factory (dependency injection), IOStreams
 internal/config/          XDG-compliant JSON config (~/.config/rmn/config.json)
 ```
